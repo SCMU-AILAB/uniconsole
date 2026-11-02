@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: uniconsole
+      POSTGRES_PASSWORD: uniconsole
+      POSTGRES_DB: uniconsole
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uniconsole"]
+      interval: 2s
+      retries: 30
+
+  server:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://uniconsole:uniconsole@db:5432/uniconsole
+    ports: ["8080:8080"]
+    depends_on:
+      db: { condition: service_healthy }
+    profiles: [full]   # 默认只起数据库；docker compose --profile full up 同时起服务
+
+volumes:
+  pgdata:

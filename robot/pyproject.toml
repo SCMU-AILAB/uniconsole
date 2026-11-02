@@ -1,0 +1,36 @@
+[project]
+name = "uniagent"
+version = "0.1.0"
+description = "UniConsole 机器人端代理：FastAPI 宿主 + WebSocket 外连服务器，Go2 执行层复用 Go2Agent"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "pydantic>=2.6",
+    "uvicorn[standard]>=0.29",
+    "websockets>=13,<16",
+]
+
+[project.optional-dependencies]
+# 真机：Go2Agent 的 UnitreeGo2Adapter + Skill Runtime（原生 unitree_sdk2_cpp bindings 需在狗端另装）
+go2 = ["go2agent"]
+
+[project.scripts]
+uniagent = "uniagent.__main__:main"
+
+[dependency-groups]
+dev = ["httpx>=0.27", "pytest>=8", "ruff>=0.6"]
+
+[tool.uv.sources]
+go2agent = { git = "https://github.com/SCMU-AILAB/Go2Agent.git", branch = "main" }
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.14"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"

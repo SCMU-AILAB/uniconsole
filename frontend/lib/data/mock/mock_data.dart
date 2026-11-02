@@ -1,0 +1,132 @@
+import '../models/models.dart';
+
+/// 示例数据，取自 design/*.dc.html 的 renderVals()。
+/// 设计稿里的「现在」是 11 月 2 日 14:32。
+abstract final class MockData {
+  static final now = DateTime(2026, 11, 2, 14, 32);
+
+  static const members = [
+    Member(id: 'kanade', name: 'Kanade', handle: '@kanade', role: MemberRole.admin),
+    Member(id: 'linyue', name: '林悦', handle: '@linyue', role: MemberRole.owner),
+    Member(id: 'zhouming', name: '周明', handle: '@zhouming', role: MemberRole.user),
+  ];
+
+  static const groups = [
+    DeviceGroup(id: 'patrol', name: '巡检队', tone: 'busy'),
+    DeviceGroup(id: 'rnd', name: '研发测试', tone: 'action'),
+    DeviceGroup(id: 'showroom', name: '展厅', tone: 'warning'),
+  ];
+
+  // Main.dc.html raw[]
+  static const devices = [
+    Device(
+      id: 'go2-01', name: 'Alpha', code: 'GO2-01', model: 'Unitree Go2 EDU', kind: DeviceKind.dog,
+      status: DeviceStatus.busy, battery: 86, latencyMs: 18, location: 'B 区 · 2 号走廊',
+      currentTask: '巡检路线 B-2 · 第 3/8 点位', groupId: 'patrol', ownerId: 'kanade', userId: 'kanade',
+      sn: 'GO2E-24A0137', firmware: 'v1.1.7', ip: '192.168.123.161', maxMotorTemp: 42,
+      uptime: Duration(hours: 3, minutes: 12),
+    ),
+    Device(
+      id: 'go2-02', name: 'Bravo', code: 'GO2-02', model: 'Unitree Go2 EDU', kind: DeviceKind.dog,
+      status: DeviceStatus.online, battery: 72, latencyMs: 22, location: 'A 区 · 实验室',
+      currentTask: '空闲 · 可申请控制', groupId: 'rnd', ownerId: 'kanade',
+      sn: 'GO2E-24A0152', firmware: 'v1.1.7', ip: '192.168.123.162', maxMotorTemp: 35,
+      uptime: Duration(minutes: 58),
+    ),
+    Device(
+      id: 'go2-03', name: 'Charlie', code: 'GO2-03', model: 'Unitree Go2 EDU', kind: DeviceKind.dog,
+      status: DeviceStatus.alert, battery: 41, latencyMs: 64, location: 'C 区 · 仓库',
+      currentTask: '左后腿电机温度 68 °C，已降速', groupId: 'patrol', ownerId: 'linyue', userId: 'zhouming',
+      sn: 'GO2E-24A0166', firmware: 'v1.1.6', ip: '192.168.123.163', maxMotorTemp: 68,
+      uptime: Duration(hours: 5, minutes: 40),
+    ),
+    Device(
+      id: 'b2-01', name: 'Delta', code: 'B2-01', model: 'Unitree B2', kind: DeviceKind.dog,
+      status: DeviceStatus.charging, battery: 23, latencyMs: 15, location: '充电桩 #2',
+      currentTask: '充电中 · 预计 48 分钟充满', groupId: 'patrol', ownerId: 'linyue',
+      sn: 'B2-23C0021', firmware: 'v1.0.9', ip: '192.168.123.171', maxMotorTemp: 31,
+    ),
+    Device(
+      id: 'g1-01', name: 'Echo', code: 'G1-01', model: 'Unitree G1', kind: DeviceKind.humanoid,
+      status: DeviceStatus.busy, battery: 64, latencyMs: 20, location: '展厅 · 中央',
+      currentTask: '联调会话 #12 · 编队跟随', groupId: 'showroom', ownerId: 'zhouming', userId: 'zhouming',
+      sn: 'G1-24F0008', firmware: 'v0.9.3', ip: '192.168.123.181', maxMotorTemp: 39,
+      uptime: Duration(hours: 1, minutes: 5),
+    ),
+    Device(
+      id: 'go2-04', name: 'Foxtrot', code: 'GO2-04', model: 'Unitree Go2 EDU', kind: DeviceKind.dog,
+      status: DeviceStatus.online, battery: 93, latencyMs: 31, location: '展厅 · 入口',
+      currentTask: '空闲', groupId: 'showroom', ownerId: 'zhouming',
+      sn: 'GO2E-24A0171', firmware: 'v1.1.7', ip: '192.168.123.164', maxMotorTemp: 33,
+      uptime: Duration(minutes: 22),
+    ),
+    Device(
+      id: 'h1-01', name: 'Golf', code: 'H1-01', model: 'Unitree H1', kind: DeviceKind.humanoid,
+      status: DeviceStatus.offline, battery: 0, latencyMs: null, location: '最后位置 · 维修间',
+      currentTask: '离线 2 小时', groupId: 'rnd', ownerId: 'kanade',
+      sn: 'H1-23B0004', firmware: 'v1.2.0', ip: '192.168.123.191',
+    ),
+    Device(
+      id: 'go2-05', name: 'Hotel', code: 'GO2-05', model: 'Unitree Go2 EDU', kind: DeviceKind.dog,
+      status: DeviceStatus.offline, battery: 0, latencyMs: null, location: '最后位置 · A 区',
+      currentTask: '离线 1 天 · 有固件更新待安装', groupId: 'rnd', ownerId: 'kanade',
+      sn: 'GO2E-24A0188', firmware: 'v1.1.5', ip: '192.168.123.165',
+    ),
+  ];
+
+  // Alerts.dc.html A[]
+  static final alerts = [
+    Alert(
+      id: 'a1', severity: AlertSeverity.critical, state: AlertState.doing, title: '左后腿电机过热',
+      deviceId: 'go2-03', metric: 'RL_calf 电机温度（°C）', createdAt: DateTime(2026, 11, 2, 14, 31),
+    ),
+    Alert(
+      id: 'a2', severity: AlertSeverity.warning, state: AlertState.open, title: '定位置信度下降',
+      deviceId: 'go2-01', metric: '定位置信度（×100）', createdAt: DateTime(2026, 11, 2, 13, 58),
+    ),
+    Alert(
+      id: 'a3', severity: AlertSeverity.warning, state: AlertState.open, title: '离线超过 24 小时',
+      deviceId: 'go2-05', metric: '心跳间隔（分钟）', createdAt: DateTime(2026, 11, 1, 18, 20),
+    ),
+    Alert(
+      id: 'a4', severity: AlertSeverity.critical, state: AlertState.closed, title: '跌倒检测触发',
+      deviceId: 'go2-04', metric: '机身俯仰角（°）', createdAt: DateTime(2026, 11, 1, 17, 20),
+    ),
+    Alert(
+      id: 'a5', severity: AlertSeverity.info, state: AlertState.closed, title: '联调指令回执超时',
+      deviceId: 'g1-01', metric: '回执延迟（ms ÷ 10）', createdAt: DateTime(2026, 11, 1, 16, 5),
+    ),
+  ];
+
+  // Fleet.dc.html：联调会话 #12
+  static const sessions = [
+    FleetSession(
+      id: 's12', name: '联调会话 #12', deviceIds: ['g1-01', 'go2-04'], leaderId: 'g1-01',
+      formation: Formation.v, spacing: 1.5,
+    ),
+  ];
+
+  // Lease.dc.html D[]（Alpha 有 1 个待处理申请）
+  static final leases = [
+    Lease(
+      deviceId: 'go2-01', holderKind: LeaseHolderKind.user, holderId: 'kanade', source: '单机操控',
+      expiresAt: DateTime(2026, 11, 2, 14, 36, 18),
+      queue: [
+        LeaseRequest(
+          userId: 'linyue', reason: '调试新步态参数，需要在 B 区走廊测试',
+          expectedDuration: const Duration(minutes: 20), createdAt: DateTime(2026, 11, 2, 14, 30),
+        ),
+      ],
+    ),
+    Lease(
+      deviceId: 'go2-03', holderKind: LeaseHolderKind.user, holderId: 'zhouming', source: '单机操控',
+      expiresAt: DateTime(2026, 11, 2, 14, 34, 51),
+    ),
+    const Lease(deviceId: 'g1-01', holderKind: LeaseHolderKind.session, holderId: 's12', source: '联调会话 #12'),
+    const Lease(deviceId: 'go2-04', holderKind: LeaseHolderKind.session, holderId: 's12', source: '联调会话 #12'),
+    Lease(
+      deviceId: 'b2-01', holderKind: LeaseHolderKind.task, holderId: 'night-patrol-c1', source: '仓库夜巡（待命）',
+      expiresAt: DateTime(2026, 11, 2, 22),
+    ),
+  ];
+}

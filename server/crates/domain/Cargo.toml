@@ -1,0 +1,21 @@
+[package]
+name = "uniconsole-domain"
+description = "UniConsole 领域模型：枚举、数据库行、对外 DTO（无 IO）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# 为模型派生 sqlx::Type / FromRow；只有访问数据库的 crate 需要开启
+sqlx = ["dep:sqlx"]
+
+[dependencies]
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+sqlx = { workspace = true, optional = true }
+
+[lints]
+workspace = true

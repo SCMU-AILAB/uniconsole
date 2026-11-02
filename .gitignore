@@ -1,0 +1,39 @@
+# ───────── 通用 ─────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.iml
+
+# 密钥与本地配置（只提交 .env.example）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ───────── server（Rust）─────────
+server/target/
+
+# ───────── robot（Python / uv）─────────
+robot/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+
+# ───────── frontend（Flutter）─────────
+# 详细规则见 frontend/.gitignore 及各平台目录下的 .gitignore
+frontend/build/
+frontend/.dart_tool/
+frontend/screenshots/
+# 设计稿不公开，只保留在本地
+frontend/design/
