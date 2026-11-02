@@ -88,16 +88,16 @@ class LineChart extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         chart,
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.x1),
         Wrap(
-          spacing: AppSpacing.xl,
+          spacing: AppSpacing.x3,
           children: [
             for (final s in series)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(width: 10, height: 2, color: s.color ?? c.accent),
-                  const SizedBox(width: AppSpacing.xs),
+                  const SizedBox(width: AppSpacing.x1),
                   Text(
                     s.label ?? '',
                     style: context.type.caption.copyWith(

@@ -14,14 +14,20 @@ final focusedDeviceIdProvider = Provider<String?>((ref) {
   final devices = ref.watch(devicesProvider).value ?? const [];
   final me = ref.watch(currentUserProvider).value;
   if (devices.isEmpty) return null;
-  return devices.where((d) => me != null && d.userId == me.id).firstOrNull?.id ?? devices.first.id;
+  return devices
+          .where((d) => me != null && d.userId == me.id)
+          .firstOrNull
+          ?.id ??
+      devices.first.id;
 });
 
 /// 侧边栏 / 标签栏入口 id → 路由。
 String? locationFor(String id, WidgetRef ref) {
   final device = ref.read(focusedDeviceIdProvider);
   final session = ref.read(fleetSessionsProvider).value?.firstOrNull?.id;
-  if (id.startsWith('group:')) return '${Routes.devices}?group=${id.substring(6)}';
+  if (id.startsWith('group:')) {
+    return '${Routes.devices}?group=${id.substring(6)}';
+  }
   return switch (id) {
     'devices' => Routes.devices,
     'control' => device == null ? Routes.devices : Routes.control(device),
@@ -95,21 +101,33 @@ class ShellScaffold extends ConsumerWidget {
       if (showDevEntries)
         const SidebarSection(
           title: '开发',
-          items: [SidebarItem(id: 'gallery', label: '组件预览', icon: AppIcons.devices)],
+          items: [
+            SidebarItem(id: 'gallery', label: '组件预览', icon: AppIcons.devices),
+          ],
         ),
     ];
 
     final tabs = [
       for (final t in MobileTabBar.defaultItems)
-        t.id == 'alerts' ? TabItem(id: t.id, label: t.label, icon: t.icon, badge: positive(summary.openAlerts)) : t,
+        t.id == 'alerts'
+            ? TabItem(
+                id: t.id,
+                label: t.label,
+                icon: t.icon,
+                badge: positive(summary.openAlerts),
+              )
+            : t,
     ];
 
     return CallbackShortcuts(
       bindings: {
         // Settings.dc.html 快捷键：⌘J 呼出智能体；⌘, 为 macOS 通用的设置。
-        const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () => go('agent'),
-        const SingleActivator(LogicalKeyboardKey.keyJ, control: true): () => go('agent'),
-        const SingleActivator(LogicalKeyboardKey.comma, meta: true): () => go('settings'),
+        const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () =>
+            go('agent'),
+        const SingleActivator(LogicalKeyboardKey.keyJ, control: true): () =>
+            go('agent'),
+        const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
+            go('settings'),
       },
       child: Focus(
         autofocus: true,
@@ -122,7 +140,11 @@ class ShellScaffold extends ConsumerWidget {
           onTabSelect: go,
           user: me == null
               ? null
-              : SidebarUser(name: me.name, role: me.role.label, color: context.colors.avatarPalette.first),
+              : SidebarUser(
+                  name: me.name,
+                  role: me.role.label,
+                  color: context.colors.avatarPalette.first,
+                ),
           onUserSettings: () => go('settings'),
           child: child,
         ),

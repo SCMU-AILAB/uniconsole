@@ -75,7 +75,7 @@ class _JoystickState extends State<Joystick> {
     Widget arrow(String s, Alignment a) => Align(
       alignment: a,
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(AppSpacing.x3),
         child: Text(s, style: hint),
       ),
     );
@@ -106,11 +106,12 @@ class _JoystickState extends State<Joystick> {
                 arrow('↺', Alignment.centerLeft),
                 arrow('↻', Alignment.centerRight),
               ],
+              // 拖动时跟手（直接操作不加动画）；松手后以弹簧回中（§13）。
               AnimatedPositioned(
                 duration: _drag == null
-                    ? const Duration(milliseconds: 180)
+                    ? AppMotion.move(context, AppMotion.snappy)
                     : Duration.zero,
-                curve: Curves.easeOutBack,
+                curve: AppMotion.snappy,
                 left: (widget.size - 2) / 2 - _knob / 2 + offset.dx,
                 top: (widget.size - 2) / 2 - _knob / 2 + offset.dy,
                 child: Container(
@@ -146,7 +147,7 @@ class _JoystickState extends State<Joystick> {
         children: [
           ExcludeSemantics(child: pad),
           if (widget.caption != null) ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.x2),
             ExcludeSemantics(
               child: Text(
                 widget.caption!,

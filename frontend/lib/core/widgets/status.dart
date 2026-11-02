@@ -67,7 +67,9 @@ class StatusPill extends StatelessWidget {
       excludeSemantics: true,
       child: Container(
         height: large ? 26 : 22,
-        padding: EdgeInsets.symmetric(horizontal: large ? 10 : 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: large ? AppSpacing.x3 : AppSpacing.x2,
+        ),
         decoration: BoxDecoration(
           color: onSurface ? context.colors.surface : sw.bg,
           borderRadius: BorderRadius.circular(large ? 13 : 11),
@@ -76,7 +78,7 @@ class StatusPill extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             StatusDot(tone),
-            const SizedBox(width: 5),
+            const SizedBox(width: AppSpacing.x1),
             Text(
               label,
               style: (large ? t.subheadMedium : t.footnoteMedium).copyWith(
@@ -118,8 +120,8 @@ class Tag extends StatelessWidget {
     );
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: large ? 8 : 6,
-        vertical: large ? 2 : 1,
+        horizontal: large ? AppSpacing.x2 : AppSpacing.x1,
+        vertical: AppSpacing.half,
       ),
       decoration: BoxDecoration(
         color: sw?.bg ?? c.separatorSubtle,
@@ -153,14 +155,16 @@ class AppChip extends StatelessWidget {
       onTap: onChanged == null ? null : () => onChanged!(!selected),
       semanticLabel: label,
       toggled: selected,
-      builder: (context, st) => Container(
+      builder: (context, st) => AnimatedContainer(
+        duration: AppMotion.fade(pressed: st.pressed),
+        curve: AppMotion.highlightCurve,
         height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
         decoration: BoxDecoration(
-          color: selected
+          color: st.pressed
+              ? Color.lerp(selected ? sw.bg : c.fillSecondary, c.label, 0.08)
+              : selected
               ? sw.bg
-              : st.hovered
-              ? Color.lerp(c.fillSecondary, c.label, 0.05)
               : c.fillSecondary,
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
@@ -205,14 +209,24 @@ class CountBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            '$count',
-            style: (small ? context.type.tabLabel : context.type.caption)
-                .copyWith(
-                  color: c.onAccent,
-                  fontWeight: FontWeight.w600,
-                  height: 1,
-                ),
+          // 计数变化时新数字以弹簧弹出（与 iOS 角标一致）。
+          AnimatedSwitcher(
+            duration: AppMotion.move(context, AppMotion.snappy),
+            switchInCurve: AppMotion.snappy,
+            transitionBuilder: (child, animation) => ScaleTransition(
+              scale: Tween(begin: 0.6, end: 1.0).animate(animation),
+              child: FadeTransition(opacity: animation, child: child),
+            ),
+            child: Text(
+              '$count',
+              key: ValueKey(count),
+              style: (small ? context.type.tabLabel : context.type.caption)
+                  .copyWith(
+                    color: c.onAccent,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                  ),
+            ),
           ),
         ],
       ),

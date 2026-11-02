@@ -17,7 +17,7 @@ class AppCard extends StatelessWidget {
       horizontal: 16,
       vertical: AppSpacing.card,
     ),
-    this.gap = AppSpacing.lg,
+    this.gap = AppSpacing.x3,
     this.radius = AppRadius.card,
     this.onTap,
     this.selected = false,
@@ -66,21 +66,20 @@ class AppCard extends StatelessWidget {
         ],
       );
     }
-    Widget frame(bool hovered) => AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+    // 卡片没有悬停态（macOS 惯例）；选中外圈淡入。
+    Widget frame(bool pressed) => AnimatedContainer(
+      duration: AppMotion.fade(pressed: pressed),
+      curve: AppMotion.highlightCurve,
       padding: padding,
       decoration: BoxDecoration(
-        color: c.surface,
+        color: pressed ? Color.lerp(c.surface, c.label, 0.03) : c.surface,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: selected ? c.accent : c.separator),
         boxShadow: [
-          if (selected) BoxShadow(color: c.accentRing, spreadRadius: 3),
-          if (hovered && !selected)
-            BoxShadow(
-              color: c.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+          BoxShadow(
+            color: selected ? c.accentRing : c.accentRing.withValues(alpha: 0),
+            spreadRadius: 3,
+          ),
         ],
       ),
       child: body,
@@ -91,7 +90,7 @@ class AppCard extends StatelessWidget {
       selected: selected,
       semanticLabel: semanticLabel,
       focusRadius: radius,
-      builder: (context, st) => frame(st.hovered),
+      builder: (context, st) => frame(st.pressed),
     );
   }
 }
@@ -142,7 +141,7 @@ class StatTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(label, style: t.subhead.copyWith(color: c.secondaryLabel)),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.x1),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
@@ -154,7 +153,7 @@ class StatTile extends StatelessWidget {
                   ),
                 ),
                 if (unit != null) ...[
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.x2),
                   Text(
                     unit!,
                     style: t.metric.copyWith(
@@ -166,7 +165,7 @@ class StatTile extends StatelessWidget {
               ],
             ),
             if (caption != null) ...[
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpacing.x1),
               Text(
                 caption!,
                 style: t.subhead.copyWith(color: c.secondaryLabel),
@@ -191,8 +190,8 @@ class MetricCell extends StatelessWidget {
     final c = context.colors;
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
+        horizontal: AppSpacing.x3,
+        vertical: AppSpacing.x2,
       ),
       decoration: BoxDecoration(
         color: c.windowBackground,
@@ -205,7 +204,7 @@ class MetricCell extends StatelessWidget {
             label,
             style: context.type.caption.copyWith(color: c.secondaryLabel),
           ),
-          const SizedBox(height: AppSpacing.xxs),
+          const SizedBox(height: AppSpacing.half),
           Text(value, style: context.type.metric.copyWith(color: c.label)),
         ],
       ),
@@ -304,12 +303,19 @@ class ProgressBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(height / 2),
         ),
         alignment: Alignment.centerLeft,
-        child: FractionallySizedBox(
-          widthFactor: v,
-          child: Container(
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: BorderRadius.circular(height / 2),
+        // 数值变化（电量、升级进度）平滑过渡，颜色随阈值淡变。
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: v),
+          duration: AppMotion.move(context, AppMotion.smooth),
+          curve: AppMotion.smooth,
+          builder: (context, w, _) => FractionallySizedBox(
+            widthFactor: w.clamp(0.0, 1.0),
+            child: AnimatedContainer(
+              duration: AppMotion.highlight,
+              decoration: BoxDecoration(
+                color: fill,
+                borderRadius: BorderRadius.circular(height / 2),
+              ),
             ),
           ),
         ),
@@ -349,7 +355,7 @@ class AppBanner extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: AppSpacing.lg,
+          vertical: AppSpacing.x3,
         ),
         decoration: BoxDecoration(
           color: bg,
@@ -358,7 +364,7 @@ class AppBanner extends StatelessWidget {
         child: Row(
           children: [
             AppIcon(icon, size: 17, color: fg, strokeWidth: 2),
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpacing.x2),
             Expanded(
               child: Text(
                 message,
@@ -371,7 +377,7 @@ class AppBanner extends StatelessWidget {
               ),
             ),
             if (action != null) ...[
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.x2),
               action!,
             ],
           ],
@@ -414,14 +420,14 @@ class EmptyState extends StatelessWidget {
             ),
             child: AppIcon(icon, size: 24, color: c.decorativeGray),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x3),
           Text(
             title,
             style: context.type.cardTitle.copyWith(color: c.label),
             textAlign: TextAlign.center,
           ),
           if (message != null) ...[
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.x1),
             Text(
               message!,
               style: context.type.subhead.copyWith(color: c.secondaryLabel),
@@ -429,7 +435,7 @@ class EmptyState extends StatelessWidget {
             ),
           ],
           if (action != null) ...[
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.x3),
             action!,
           ],
         ],

@@ -25,19 +25,30 @@ abstract final class AppRadius {
   static const double tag = 5;
 }
 
+/// 间距：4pt 网格（HANDOFF.md §13）。所有内外边距与间隔都必须取自这里。
+///
+/// 命名即倍数：x3 = 3 × 4 = 12。唯一例外是 [half]（2pt），只用于紧贴关系：
+/// 分段控件轨道内边距、标题与副标题之间、导航项之间的细缝。
 abstract final class AppSpacing {
-  static const double xxs = 2;
-  static const double xs = 4;
-  static const double sm = 6;
-  static const double md = 8;
-  static const double lg = 10;
-  static const double xl = 12;
-  static const double xxl = 16;
-  static const double section = 20;
-  static const double page = 24;
+  static const double half = 2;
+  static const double x1 = 4;
+  static const double x2 = 8;
+  static const double x3 = 12;
+  static const double x4 = 16;
+  static const double x5 = 20;
+  static const double x6 = 24;
+  static const double x7 = 28;
+  static const double x8 = 32;
+  static const double x9 = 36;
+
+  /// 内容区内边距（水平）
+  static const double page = x6;
 
   /// 卡片内边距
-  static const double card = 14;
+  static const double card = x4;
+
+  /// 区块之间
+  static const double section = x5;
 }
 
 abstract final class AppSizes {

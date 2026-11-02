@@ -10,7 +10,8 @@ import 'package:flutter/widgets.dart';
 abstract final class WindowChrome {
   static const _channel = MethodChannel('uniconsole/window');
 
-  static bool get _isMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+  static bool get _isMacOS =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 
   /// 标准 macOS 标题栏高度。测试环境（flutter_test 模拟 macOS 时）同样生效。
   static double get titlebarHeight => _isMacOS ? 28 : 0;

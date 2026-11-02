@@ -228,11 +228,11 @@ class FloorMapView extends StatelessWidget {
                                 painter: _TrianglePainter(c.label),
                               ),
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: AppSpacing.x1),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
+                                horizontal: AppSpacing.x1,
+                                vertical: AppSpacing.half,
                               ),
                               decoration: BoxDecoration(
                                 color: c.surface,
@@ -302,9 +302,9 @@ class FloorMapView extends StatelessWidget {
                   ),
                 if (footer != null)
                   Positioned(
-                    left: 14,
-                    right: 14,
-                    bottom: 12,
+                    left: AppSpacing.x4,
+                    right: AppSpacing.x4,
+                    bottom: AppSpacing.x3,
                     child: Text(
                       footer!,
                       maxLines: 1,

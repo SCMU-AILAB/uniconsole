@@ -40,24 +40,27 @@ class GroupedListRow extends StatelessWidget {
     final mobile = GroupedListScope.isMobile(context);
     final chevron = showChevron ?? onTap != null;
 
-    Widget row(bool hovered) => Container(
+    // 与 UITableView / NSTableView 一致：没有悬停态，按下即时高亮、松开渐隐。
+    Widget row(bool pressed) => AnimatedContainer(
+      duration: AppMotion.fade(pressed: pressed),
+      curve: AppMotion.highlightCurve,
       constraints: BoxConstraints(
         minHeight: mobile ? AppSizes.minTouchTarget : 0,
       ),
       color: selected
           ? c.rowSelected
-          : hovered
-          ? c.label.withValues(alpha: 0.04)
-          : Colors.transparent,
+          : pressed
+          ? c.label.withValues(alpha: 0.08)
+          : c.label.withValues(alpha: 0),
       padding: EdgeInsets.symmetric(
-        horizontal: mobile ? 14 : AppSpacing.xl,
-        vertical: mobile ? AppSpacing.lg : 9,
+        horizontal: mobile ? AppSpacing.x4 : AppSpacing.x3,
+        vertical: mobile ? AppSpacing.x3 : AppSpacing.x2,
       ),
       child: Row(
         children: [
           if (leading != null) ...[
             leading!,
-            SizedBox(width: mobile ? AppSpacing.xl : AppSpacing.lg),
+            SizedBox(width: mobile ? AppSpacing.x3 : AppSpacing.x3),
           ],
           Expanded(
             child: Column(
@@ -78,7 +81,7 @@ class GroupedListRow extends StatelessWidget {
                   ),
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 1),
+                  const SizedBox(height: AppSpacing.half),
                   Text(
                     subtitle!,
                     maxLines: 2,
@@ -92,7 +95,7 @@ class GroupedListRow extends StatelessWidget {
             ),
           ),
           if (value != null) ...[
-            const SizedBox(width: AppSpacing.lg),
+            const SizedBox(width: AppSpacing.x3),
             Text(
               value!,
               textAlign: TextAlign.right,
@@ -104,11 +107,11 @@ class GroupedListRow extends StatelessWidget {
             ),
           ],
           if (trailing != null) ...[
-            const SizedBox(width: AppSpacing.lg),
+            const SizedBox(width: AppSpacing.x3),
             trailing!,
           ],
           if (chevron) ...[
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpacing.x2),
             AppIcon(
               AppIcons.chevronRight,
               size: mobile ? 14 : 12,
@@ -125,7 +128,7 @@ class GroupedListRow extends StatelessWidget {
       onTap: onTap,
       selected: selected,
       focusRadius: 0,
-      builder: (context, st) => row(st.hovered),
+      builder: (context, st) => row(st.pressed),
     );
   }
 }
@@ -194,7 +197,7 @@ class GroupedList extends StatelessWidget {
         children: [
           if (header != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, AppSpacing.sm),
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, AppSpacing.x2),
               child: Semantics(
                 header: true,
                 child: Text(
@@ -217,7 +220,7 @@ class GroupedList extends StatelessWidget {
           ),
           if (footer != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, AppSpacing.sm, 4, 0),
+              padding: const EdgeInsets.fromLTRB(4, AppSpacing.x2, 4, 0),
               child: Text(
                 footer!,
                 style: context.type.footnote.copyWith(color: c.secondaryLabel),
@@ -257,7 +260,7 @@ class InsetGroupedSection extends StatelessWidget {
         children: [
           if (header != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, AppSpacing.sm),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, AppSpacing.x2),
               child: Semantics(
                 header: true,
                 child: Text(
@@ -284,7 +287,7 @@ class InsetGroupedSection extends StatelessWidget {
           ),
           if (footer != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, AppSpacing.sm, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, AppSpacing.x2, 16, 0),
               child: Text(
                 footer!,
                 style: context.type.mobileFootnote.copyWith(

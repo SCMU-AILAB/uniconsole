@@ -10,7 +10,7 @@ class ResponsiveGrid extends StatelessWidget {
     super.key,
     required this.minItemWidth,
     required this.children,
-    this.gap = AppSpacing.xl,
+    this.gap = AppSpacing.x3,
     this.maxColumns = 6,
   });
 
@@ -64,13 +64,13 @@ class GallerySection extends StatelessWidget {
           ),
         ),
         if (description != null) ...[
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.x1),
           Text(
             description!,
             style: context.type.subhead.copyWith(color: c.secondaryLabel),
           ),
         ],
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.x3),
         child,
       ],
     );
@@ -95,16 +95,16 @@ class _Demo extends StatelessWidget {
             color: context.colors.secondaryLabel,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.x2),
         child,
       ],
     );
   }
 }
 
-Widget _wrap(List<Widget> children, {double spacing = AppSpacing.md}) => Wrap(
+Widget _wrap(List<Widget> children, {double spacing = AppSpacing.x2}) => Wrap(
   spacing: spacing,
-  runSpacing: AppSpacing.md,
+  runSpacing: AppSpacing.x2,
   crossAxisAlignment: WrapCrossAlignment.center,
   children: children,
 );
@@ -177,11 +177,11 @@ class ColorsSection extends StatelessWidget {
         children: [
           ResponsiveGrid(
             minItemWidth: 150,
-            gap: AppSpacing.md,
+            gap: AppSpacing.x2,
             children: [
               for (final (name, color) in tokens)
                 Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                  padding: const EdgeInsets.all(AppSpacing.x2),
                   decoration: BoxDecoration(
                     color: c.surface,
                     borderRadius: BorderRadius.circular(AppRadius.group),
@@ -198,7 +198,7 @@ class ColorsSection extends StatelessWidget {
                           border: Border.all(color: c.separator),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
+                      const SizedBox(width: AppSpacing.x2),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,14 +226,14 @@ class ColorsSection extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: AppSpacing.x4),
           ResponsiveGrid(
             minItemWidth: 190,
-            gap: AppSpacing.md,
+            gap: AppSpacing.x2,
             children: [
               for (final (name, tone) in tones)
                 Container(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  padding: const EdgeInsets.all(AppSpacing.x3),
                   decoration: BoxDecoration(
                     color: c.surface,
                     borderRadius: BorderRadius.circular(AppRadius.group),
@@ -243,7 +243,7 @@ class ColorsSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       StatusPill(tone: tone, label: name),
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.x2),
                       Text(
                         'dot ${_hex(s.of(tone).dot)}\nfg  ${_hex(s.of(tone).fg)}\nbg  ${_hex(s.of(tone).bg)}',
                         style: context.type.mono.copyWith(
@@ -299,7 +299,7 @@ class TypographySection extends StatelessWidget {
       children: [
         for (final (name, style, sample) in list)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.x1),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -357,10 +357,10 @@ class MetricsSection extends StatelessWidget {
       ('card 14', AppRadius.card),
     ];
     final spaces = [
-      AppSpacing.xs,
-      AppSpacing.md,
-      AppSpacing.xl,
-      AppSpacing.xxl,
+      AppSpacing.x1,
+      AppSpacing.x2,
+      AppSpacing.x3,
+      AppSpacing.x4,
       AppSpacing.section,
       AppSpacing.page,
     ];
@@ -373,7 +373,7 @@ class MetricsSection extends StatelessWidget {
         children: [
           AppCard(
             title: '圆角',
-            child: _wrap(spacing: AppSpacing.xl, [
+            child: _wrap(spacing: AppSpacing.x3, [
               for (final (name, r) in radii)
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -387,7 +387,7 @@ class MetricsSection extends StatelessWidget {
                         border: Border.all(color: c.controlBorder),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.x1),
                     Text(
                       name,
                       style: t.caption.copyWith(color: c.secondaryLabel),
@@ -403,7 +403,9 @@ class MetricsSection extends StatelessWidget {
               children: [
                 for (final s in spaces)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.x1,
+                    ),
                     child: Row(
                       children: [
                         SizedBox(
@@ -476,7 +478,7 @@ class ButtonsSection extends StatelessWidget {
                     const PrimaryButton(label: '禁用', onPressed: null),
                   ]),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.x4),
                 _Demo(
                   '常规 · 详情操作（32）',
                   _wrap([
@@ -503,7 +505,7 @@ class ButtonsSection extends StatelessWidget {
                     ),
                   ]),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.x4),
                 _Demo(
                   '大号 · 姿态动作（40）',
                   _wrap([
@@ -546,7 +548,7 @@ class ButtonsSection extends StatelessWidget {
                     ),
                   ]),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.x4),
                 _Demo(
                   '图标按钮',
                   _wrap([
@@ -586,10 +588,10 @@ class ButtonsSection extends StatelessWidget {
                     ),
                   ]),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.x4),
                 _Demo(
                   '图标（AppIcon · 1.8px 描边，取自设计稿）',
-                  _wrap(spacing: AppSpacing.xl, [
+                  _wrap(spacing: AppSpacing.x3, [
                     for (final i in AppIcons.values)
                       Tooltip(
                         message: i.name,
@@ -662,7 +664,7 @@ class _InputsSectionState extends State<InputsSection> {
                     ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.x3),
                 _Demo(
                   '分段控件 · 撑满（速度档位）',
                   SegmentedControl<String>(
@@ -678,7 +680,7 @@ class _InputsSectionState extends State<InputsSection> {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.x3),
                 _Demo(
                   '分段控件 · 移动',
                   SegmentedControl<String>(
@@ -695,7 +697,7 @@ class _InputsSectionState extends State<InputsSection> {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.x3),
                 _Demo(
                   '搜索框',
                   Column(
@@ -706,7 +708,7 @@ class _InputsSectionState extends State<InputsSection> {
                         semanticLabel: '搜索设备',
                         width: 200,
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.x2),
                       const SearchField(
                         hint: '搜索',
                         semanticLabel: '搜索设备',
@@ -761,10 +763,10 @@ class _InputsSectionState extends State<InputsSection> {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.x2),
                 _Demo(
                   '复选框 / 单选',
-                  _wrap(spacing: AppSpacing.xxl, [
+                  _wrap(spacing: AppSpacing.x4, [
                     AppCheckbox(
                       value: _check1,
                       label: 'Alpha',
@@ -794,7 +796,7 @@ class _InputsSectionState extends State<InputsSection> {
                     ),
                   ]),
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.x3),
                 _Demo(
                   '滑块',
                   Column(
@@ -841,10 +843,10 @@ class _InputsSectionState extends State<InputsSection> {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.x2),
                 _Demo(
                   '芯片（辅助功能开关）',
-                  _wrap(spacing: AppSpacing.sm, [
+                  _wrap(spacing: AppSpacing.x2, [
                     AppChip(
                       label: _avoid ? '避障 开' : '避障 关',
                       selected: _avoid,
@@ -878,7 +880,7 @@ class _InputsSectionState extends State<InputsSection> {
   ) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
       child: Row(
         children: [
           Expanded(
@@ -899,7 +901,7 @@ class _InputsSectionState extends State<InputsSection> {
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.lg),
+          const SizedBox(width: AppSpacing.x3),
           trailing,
         ],
       ),
@@ -940,7 +942,7 @@ class StatusSection extends StatelessWidget {
                 ),
               ]),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.x3),
             _Demo(
               '标签 / 圆点 / 徽标',
               _wrap([
@@ -965,15 +967,15 @@ class StatusSection extends StatelessWidget {
                 const Tag(label: '处理中'),
                 const Tag(label: 'Owner'),
                 const Tag(label: '联调', tone: StatusTone.action),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.x2),
                 for (final t in StatusTone.values) StatusDot(t, size: 9),
                 StatusDot(StatusTone.online, size: 11, ring: c.surface),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.x2),
                 const CountBadge(2),
                 const CountBadge(1, small: true),
               ]),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.x3),
             _Demo(
               '头像',
               _wrap([
@@ -984,7 +986,7 @@ class StatusSection extends StatelessWidget {
                 const Avatar(name: '—', size: 20),
               ]),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.x3),
             _Demo(
               '电量条',
               Column(
@@ -1001,7 +1003,7 @@ class StatusSection extends StatelessWidget {
                           Expanded(
                             child: ProgressBar(value: v, semanticLabel: '电量'),
                           ),
-                          const SizedBox(width: AppSpacing.md),
+                          const SizedBox(width: AppSpacing.x2),
                           SizedBox(
                             width: 34,
                             child: Text(
@@ -1026,7 +1028,7 @@ class StatusSection extends StatelessWidget {
                             semanticLabel: '升级进度',
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.md),
+                        const SizedBox(width: AppSpacing.x2),
                         SizedBox(
                           width: 34,
                           child: Text(
@@ -1137,7 +1139,7 @@ class _CardsSectionState extends State<CardsSection> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x3),
           ResponsiveGrid(
             minItemWidth: 250,
             maxColumns: 3,
@@ -1170,7 +1172,7 @@ class _CardsSectionState extends State<CardsSection> {
                               strokeWidth: 1.6,
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.lg),
+                          const SizedBox(width: AppSpacing.x3),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1195,7 +1197,7 @@ class _CardsSectionState extends State<CardsSection> {
                           StatusPill(tone: d.$3, label: d.$4),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xl),
+                      const SizedBox(height: AppSpacing.x3),
                       Text(
                         d.$5,
                         maxLines: 1,
@@ -1205,7 +1207,7 @@ class _CardsSectionState extends State<CardsSection> {
                           color: c.label,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.x1),
                       Row(
                         children: [
                           AppIcon(
@@ -1213,7 +1215,7 @@ class _CardsSectionState extends State<CardsSection> {
                             size: 11,
                             strokeWidth: 2.2,
                           ),
-                          const SizedBox(width: AppSpacing.xs),
+                          const SizedBox(width: AppSpacing.x1),
                           Text(
                             d.$6,
                             style: context.type.footnote.copyWith(
@@ -1222,7 +1224,7 @@ class _CardsSectionState extends State<CardsSection> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xl),
+                      const SizedBox(height: AppSpacing.x3),
                       Row(
                         children: [
                           Expanded(
@@ -1231,7 +1233,7 @@ class _CardsSectionState extends State<CardsSection> {
                               semanticLabel: '电量',
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.md),
+                          const SizedBox(width: AppSpacing.x2),
                           SizedBox(
                             width: 30,
                             child: Text(
@@ -1249,12 +1251,12 @@ class _CardsSectionState extends State<CardsSection> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.x3),
                       Container(height: 1, color: c.separatorSubtle),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.x3),
                       Wrap(
-                        spacing: 14,
-                        runSpacing: 4,
+                        spacing: AppSpacing.x4,
+                        runSpacing: AppSpacing.x1,
                         children: [
                           for (final (role, who) in [
                             ('管理', d.$9),
@@ -1268,7 +1270,7 @@ class _CardsSectionState extends State<CardsSection> {
                                   size: 20,
                                   color: _personColor(who),
                                 ),
-                                const SizedBox(width: AppSpacing.sm),
+                                const SizedBox(width: AppSpacing.x2),
                                 Text(
                                   '$role ',
                                   style: context.type.footnote.copyWith(
@@ -1290,7 +1292,7 @@ class _CardsSectionState extends State<CardsSection> {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x3),
           ResponsiveGrid(
             minItemWidth: 300,
             maxColumns: 2,
@@ -1302,11 +1304,11 @@ class _CardsSectionState extends State<CardsSection> {
                     Expanded(
                       child: MetricCell(label: '横滚 Roll', value: '1.2°'),
                     ),
-                    SizedBox(width: AppSpacing.md),
+                    SizedBox(width: AppSpacing.x2),
                     Expanded(
                       child: MetricCell(label: '俯仰 Pitch', value: '−3.4°'),
                     ),
-                    SizedBox(width: AppSpacing.md),
+                    SizedBox(width: AppSpacing.x2),
                     Expanded(
                       child: MetricCell(label: '航向 Yaw', value: '87.5°'),
                     ),
@@ -1332,7 +1334,7 @@ class _CardsSectionState extends State<CardsSection> {
                             color: c.label,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.x2),
                         Text(
                           '%',
                           style: context.type.metric.copyWith(
@@ -1342,7 +1344,7 @@ class _CardsSectionState extends State<CardsSection> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.x2),
                     const ProgressBar(
                       value: 0.86,
                       height: 6,
@@ -1417,7 +1419,7 @@ class ListsSection extends StatelessWidget {
                     GroupedListRow(title: '授权使用者', value: '3 人', onTap: noop),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.x4),
                 const GroupedList(
                   header: '设备信息',
                   children: [
@@ -1432,7 +1434,7 @@ class ListsSection extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.all(AppSpacing.xxl),
+            padding: const EdgeInsets.all(AppSpacing.x4),
             decoration: BoxDecoration(
               color: c.mobileBackground,
               borderRadius: BorderRadius.circular(AppRadius.card),
@@ -1541,20 +1543,24 @@ class FeedbackSection extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (estop) ...[
-                const AppBanner(
-                  kind: BannerKind.emergency,
-                  message: '已触发急停 · 电机进入阻尼模式，所有运动指令被拒绝',
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
+              Presence(
+                child: estop
+                    ? const Padding(
+                        padding: EdgeInsets.only(bottom: AppSpacing.x2),
+                        child: AppBanner(
+                          kind: BannerKind.emergency,
+                          message: '已触发急停 · 电机进入阻尼模式，所有运动指令被拒绝',
+                        ),
+                      )
+                    : null,
+              ),
               const AppBanner(kind: BannerKind.success, message: 'SLAM 地图同步完成'),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.x2),
               const AppBanner(
                 kind: BannerKind.info,
                 message: '你持有控制权 · 租约 4:18 后自动续期',
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.x2),
               AppBanner(
                 kind: BannerKind.warning,
                 message: 'Charlie 电机过热，已自动移出候选列表。',
@@ -1625,8 +1631,8 @@ class _TableSectionState extends State<TableSection> {
       description: '表头 · 行选中 · 批量勾选 · 宽度不足时容器内横向滚动（拖窄窗口试试）。',
       child: AppCard(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.x2,
+          vertical: AppSpacing.x2,
         ),
         child: AppDataTable(
           checkboxes: true,
@@ -1654,7 +1660,7 @@ class _TableSectionState extends State<TableSection> {
                         size: 30,
                         color: _personColor(members[i].$1),
                       ),
-                      const SizedBox(width: AppSpacing.lg),
+                      const SizedBox(width: AppSpacing.x3),
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1757,7 +1763,7 @@ class ChartsSection extends StatelessWidget {
                 ])
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.sm,
+                      vertical: AppSpacing.x2,
                     ),
                     child: Row(
                       children: [
@@ -1832,14 +1838,14 @@ class _TimelineSectionState extends State<TimelineSection> {
           AppCard(
             padding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: AppSpacing.xl,
+              vertical: AppSpacing.x3,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Wrap(
-                  spacing: AppSpacing.lg,
-                  runSpacing: AppSpacing.md,
+                  spacing: AppSpacing.x3,
+                  runSpacing: AppSpacing.x2,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     SecondaryButton(
@@ -1892,7 +1898,7 @@ class _TimelineSectionState extends State<TimelineSection> {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.x3),
                 TimelineTrack(
                   position: _pos,
                   positionLabel: _time,
@@ -1952,7 +1958,7 @@ class _TimelineSectionState extends State<TimelineSection> {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x3),
           AppCard(
             title: '今日排期',
             trailing: Text(
@@ -2089,7 +2095,7 @@ class _ControlSectionState extends State<ControlSection> {
                 ? Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: AppSpacing.lg,
+                      vertical: AppSpacing.x3,
                     ),
                     decoration: BoxDecoration(
                       color: c.emergency,
@@ -2104,7 +2110,7 @@ class _ControlSectionState extends State<ControlSection> {
                           color: c.onAccent,
                           strokeWidth: 2,
                         ),
-                        const SizedBox(width: AppSpacing.md),
+                        const SizedBox(width: AppSpacing.x2),
                         Flexible(
                           child: Text(
                             '已触发急停 · 电机进入阻尼模式，所有运动指令被拒绝',
@@ -2120,13 +2126,13 @@ class _ControlSectionState extends State<ControlSection> {
                 : null,
           ),
           AppCard(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.x5),
             child: Column(
               children: [
                 Wrap(
                   alignment: WrapAlignment.spaceAround,
                   spacing: AppSpacing.page,
-                  runSpacing: AppSpacing.xxl,
+                  runSpacing: AppSpacing.x4,
                   children: [
                     Joystick(
                       semanticLabel: '移动摇杆',
@@ -2147,7 +2153,7 @@ class _ControlSectionState extends State<ControlSection> {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.x4),
                 Text(
                   '支持键盘、手柄与触控 · 空格键 = 急停 · 松开所有输入 300 ms 后自动停止',
                   textAlign: TextAlign.center,
@@ -2190,9 +2196,9 @@ class PointCloudSection extends StatelessWidget {
               pointSize: 2.2,
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.x2),
           Wrap(
-            spacing: AppSpacing.xxl,
+            spacing: AppSpacing.x4,
             children: [
               for (final (label, color) in [
                 ('近 < 1 m', c.cloudNear),
@@ -2203,7 +2209,7 @@ class PointCloudSection extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(width: 8, height: 8, color: color),
-                    const SizedBox(width: AppSpacing.sm),
+                    const SizedBox(width: AppSpacing.x2),
                     Text(
                       label,
                       style: context.type.footnote.copyWith(
@@ -2296,8 +2302,8 @@ class _MapSectionState extends State<MapSection> {
               'B 区 · 2 层 · 分辨率 5 cm · 更新于今天 07:12 · 当前工具：${_tools.firstWhere((e) => e.$1 == _tool).$2}',
           overlays: [
             Positioned(
-              left: 14,
-              top: 14,
+              left: AppSpacing.x4,
+              top: AppSpacing.x4,
               child: MapOverlayPanel(
                 child: Semantics(
                   label: '地图工具',
@@ -2315,14 +2321,16 @@ class _MapSectionState extends State<MapSection> {
                             builder: (context, st) => Container(
                               height: 30,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.lg,
+                                horizontal: AppSpacing.x3,
                               ),
                               alignment: Alignment.centerLeft,
-                              margin: const EdgeInsets.only(bottom: 2),
+                              margin: const EdgeInsets.only(
+                                bottom: AppSpacing.half,
+                              ),
                               decoration: BoxDecoration(
                                 color: _tool == id
                                     ? c.accentFill
-                                    : st.hovered
+                                    : st.pressed
                                     ? c.fillSecondary
                                     : null,
                                 borderRadius: BorderRadius.circular(
@@ -2344,12 +2352,12 @@ class _MapSectionState extends State<MapSection> {
               ),
             ),
             Positioned(
-              right: 14,
-              top: 14,
+              right: AppSpacing.x4,
+              top: AppSpacing.x4,
               child: MapOverlayPanel(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.lg,
+                  horizontal: AppSpacing.x3,
+                  vertical: AppSpacing.x3,
                 ),
                 child: DefaultTextStyle.merge(
                   style: t.footnote.copyWith(color: c.tertiaryLabel),
@@ -2363,9 +2371,9 @@ class _MapSectionState extends State<MapSection> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.x1),
                       const Text('8 个点位 · 全长 64 m · 预计 18 分钟'),
-                      const SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.x1),
                       Text('选中点位 $_point'),
                     ],
                   ),
@@ -2395,7 +2403,7 @@ class LogsSection extends StatelessWidget {
         children: [
           AppCard(
             title: '指令日志',
-            gap: AppSpacing.md,
+            gap: AppSpacing.x2,
             trailing: Semantics(
               link: true,
               child: Text(
@@ -2507,7 +2515,7 @@ class _NavigationSectionState extends State<NavigationSection> {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x3),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 390),

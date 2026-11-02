@@ -35,5 +35,7 @@ dist/
 frontend/build/
 frontend/.dart_tool/
 frontend/screenshots/
+# 本地调试配置（含本机 Xcode 的构建变通）
+frontend/.vscode/
 # 设计稿不公开，只保留在本地
 frontend/design/

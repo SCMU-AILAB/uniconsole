@@ -121,7 +121,7 @@ class LogConsole extends StatelessWidget {
             children: [
               if (l.time != null) ...[
                 Text(l.time!, style: base.copyWith(color: c.secondaryLabel)),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.x2),
               ],
               if (l.source != null) ...[
                 Text(
@@ -131,7 +131,7 @@ class LogConsole extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.x2),
               ],
               Expanded(
                 child: Text(
@@ -170,7 +170,7 @@ class LogConsole extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) SizedBox(height: terminal ? 3 : 5),
+          if (i > 0) const SizedBox(height: AppSpacing.x1),
           rows[i],
         ],
       ],
@@ -208,8 +208,8 @@ class LogConsole extends StatelessWidget {
                 Container(
                   color: tc.header,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.md,
+                    horizontal: AppSpacing.x3,
+                    vertical: AppSpacing.x2,
                   ),
                   child: Row(
                     children: [
@@ -219,11 +219,11 @@ class LogConsole extends StatelessWidget {
                           child: Row(
                             children: [
                               for (var i = 0; i < tabs.length; i++) ...[
-                                if (i > 0) const SizedBox(width: AppSpacing.sm),
+                                if (i > 0) const SizedBox(width: AppSpacing.x2),
                                 Container(
                                   height: 26,
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.lg,
+                                    horizontal: AppSpacing.x3,
                                   ),
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
@@ -249,7 +249,7 @@ class LogConsole extends StatelessWidget {
                         ),
                       ),
                       if (headerNote != null) ...[
-                        const SizedBox(width: AppSpacing.md),
+                        const SizedBox(width: AppSpacing.x2),
                         Text(
                           headerNote!,
                           maxLines: 1,
@@ -262,8 +262,8 @@ class LogConsole extends StatelessWidget {
                 ),
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: AppSpacing.xl,
+                  horizontal: AppSpacing.x4,
+                  vertical: AppSpacing.x3,
                 ),
                 child: body,
               ),

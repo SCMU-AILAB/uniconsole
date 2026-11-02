@@ -6,11 +6,21 @@ import 'repositories/repositories.dart';
 
 // ---- Repository（接真实后端时在 ProviderScope 里 override） ----
 
-final deviceRepositoryProvider = Provider<DeviceRepository>((ref) => MockDeviceRepository());
-final alertRepositoryProvider = Provider<AlertRepository>((ref) => MockAlertRepository());
-final fleetRepositoryProvider = Provider<FleetRepository>((ref) => MockFleetRepository());
-final leaseRepositoryProvider = Provider<LeaseRepository>((ref) => MockLeaseRepository());
-final memberRepositoryProvider = Provider<MemberRepository>((ref) => MockMemberRepository());
+final deviceRepositoryProvider = Provider<DeviceRepository>(
+  (ref) => MockDeviceRepository(),
+);
+final alertRepositoryProvider = Provider<AlertRepository>(
+  (ref) => MockAlertRepository(),
+);
+final fleetRepositoryProvider = Provider<FleetRepository>(
+  (ref) => MockFleetRepository(),
+);
+final leaseRepositoryProvider = Provider<LeaseRepository>(
+  (ref) => MockLeaseRepository(),
+);
+final memberRepositoryProvider = Provider<MemberRepository>(
+  (ref) => MockMemberRepository(),
+);
 
 // ---- 数据流 ----
 
@@ -67,8 +77,14 @@ class FleetSummary {
   int get offline => total - online;
 
   static const empty = FleetSummary(
-    total: 0, online: 0, openAlerts: 0, activeAlerts: 0, fleetSessions: 0,
-    controlSessions: 0, pendingLeaseRequests: 0, groupCounts: {},
+    total: 0,
+    online: 0,
+    openAlerts: 0,
+    activeAlerts: 0,
+    fleetSessions: 0,
+    controlSessions: 0,
+    pendingLeaseRequests: 0,
+    groupCounts: {},
   );
 }
 
@@ -87,7 +103,14 @@ final fleetSummaryProvider = Provider<FleetSummary>((ref) {
     openAlerts: alerts.where((a) => a.state == AlertState.open).length,
     activeAlerts: alerts.where((a) => a.state != AlertState.closed).length,
     fleetSessions: sessions.length,
-    controlSessions: leases.where((l) => l.holderKind != LeaseHolderKind.task).map((l) => l.holderKind == LeaseHolderKind.session ? l.holderId : l.deviceId).toSet().length,
+    controlSessions: leases
+        .where((l) => l.holderKind != LeaseHolderKind.task)
+        .map(
+          (l) =>
+              l.holderKind == LeaseHolderKind.session ? l.holderId : l.deviceId,
+        )
+        .toSet()
+        .length,
     pendingLeaseRequests: leases.fold(0, (n, l) => n + l.queue.length),
     groupCounts: groups,
   );

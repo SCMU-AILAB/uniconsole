@@ -51,7 +51,10 @@ class AppDataTable extends StatelessWidget {
     required this.rows,
     this.minWidth = 620,
     this.checkboxes = false,
-    this.rowPadding = const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    this.rowPadding = const EdgeInsets.symmetric(
+      horizontal: AppSpacing.x3,
+      vertical: AppSpacing.x3,
+    ),
   });
 
   final List<AppDataColumn> columns;
@@ -62,7 +65,7 @@ class AppDataTable extends StatelessWidget {
   final bool checkboxes;
   final EdgeInsetsGeometry rowPadding;
 
-  static const _gap = 10.0;
+  static const _gap = AppSpacing.x3;
 
   @override
   Widget build(BuildContext context) {
@@ -90,8 +93,8 @@ class AppDataTable extends StatelessWidget {
 
     final header = Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: AppSpacing.md,
+        horizontal: AppSpacing.x3,
+        vertical: AppSpacing.x2,
       ),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: c.separator)),
@@ -110,14 +113,17 @@ class AppDataTable extends StatelessWidget {
 
     final body = <Widget>[header];
     for (final r in rows) {
-      Widget row(bool hovered) => Container(
+      // 表格行没有悬停态；按下时短暂高亮（§13）。
+      Widget row(bool pressed) => AnimatedContainer(
+        duration: AppMotion.fade(pressed: pressed),
+        curve: AppMotion.highlightCurve,
         padding: rowPadding,
         decoration: BoxDecoration(
           color: r.selected
               ? c.rowSelected
-              : hovered
-              ? c.label.withValues(alpha: 0.03)
-              : Colors.transparent,
+              : pressed
+              ? c.label.withValues(alpha: 0.05)
+              : c.label.withValues(alpha: 0),
           border: Border(bottom: BorderSide(color: c.separatorSubtle)),
         ),
         child: DefaultTextStyle.merge(
@@ -142,7 +148,7 @@ class AppDataTable extends StatelessWidget {
                 selected: r.selected,
                 semanticLabel: r.semanticLabel,
                 focusRadius: 0,
-                builder: (context, st) => row(st.hovered),
+                builder: (context, st) => row(st.pressed),
               ),
       );
     }

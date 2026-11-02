@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/theme/theme.dart';
 import 'package:uniconsole/main.dart';
 
-/// 在三种窗口宽度、两种外观下渲染预览页，确保没有溢出或异常（§10 布局切换）。
+/// 在多种窗口宽度、两种外观下渲染组件预览页，确保没有溢出或异常（§10 布局切换）。
 void main() {
   for (final width in [1440.0, 1000.0, 760.0, 390.0]) {
     for (final mode in [ThemeMode.light, ThemeMode.dark]) {
@@ -20,15 +21,21 @@ void main() {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
-            child: const UniConsoleApp(),
+            child: const UniConsoleApp(initialLocation: Routes.gallery),
           ),
         );
         await tester.pumpAndSettle();
 
-        // 逐屏滚到底，让所有区块都完成布局。
-        final scrollable = find.byType(Scrollable).first;
+        // 逐屏滚到底，让所有区块都完成布局。主内容区是最大的那个纵向滚动视图。
+        final scrollable = find
+            .byType(Scrollable)
+            .evaluate()
+            .map((e) => e.widget as Scrollable)
+            .where((s) => s.axisDirection == AxisDirection.down)
+            .toList();
+        final main = find.byWidget(scrollable.last);
         for (var i = 0; i < 40; i++) {
-          await tester.drag(scrollable, const Offset(0, -800));
+          await tester.drag(main, const Offset(0, -800), warnIfMissed: false);
           await tester.pump();
         }
         expect(tester.takeException(), isNull);

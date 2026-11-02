@@ -102,7 +102,9 @@ String? sidebarIdFor(Uri uri) {
 /// 由当前地址得到移动端标签栏选中项（设备 / 操控 / 智能体 / 告警 / 我的）。
 String tabIdFor(Uri uri) {
   final seg = uri.pathSegments;
-  if (seg.length >= 3 && seg[0] == 'devices' && seg[2] == 'control') return 'control';
+  if (seg.length >= 3 && seg[0] == 'devices' && seg[2] == 'control') {
+    return 'control';
+  }
   if (uri.path.startsWith('/devices')) return 'devices';
   if (uri.path.startsWith('/agent')) return 'agent';
   if (uri.path.startsWith('/alerts')) return 'alerts';

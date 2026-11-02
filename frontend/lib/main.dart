@@ -1,37 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'app/destinations.dart';
+import 'app/router.dart';
 import 'core/dev/debug_screenshot.dart';
 import 'core/theme/theme.dart';
-import 'features/gallery/gallery_page.dart';
 
 void main() {
   final container = ProviderContainer();
-  if (debugStartDark) {
-    container.read(themeModeProvider.notifier).set(ThemeMode.dark);
+  switch (debugThemeOverride) {
+    case 'light':
+      container.read(themeModeProvider.notifier).set(ThemeMode.light);
+    case 'dark':
+      container.read(themeModeProvider.notifier).set(ThemeMode.dark);
   }
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: const UniConsoleApp(),
+      child: UniConsoleApp(
+        initialLocation: debugInitialRoute ?? Routes.devices,
+      ),
     ),
   );
   maybeCaptureDebugScreenshot();
 }
 
-class UniConsoleApp extends ConsumerWidget {
-  const UniConsoleApp({super.key});
+class UniConsoleApp extends ConsumerStatefulWidget {
+  const UniConsoleApp({super.key, this.initialLocation = Routes.devices});
+
+  final String initialLocation;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp(
+  ConsumerState<UniConsoleApp> createState() => _UniConsoleAppState();
+}
+
+class _UniConsoleAppState extends ConsumerState<UniConsoleApp> {
+  late final GoRouter _router = buildRouter(
+    initialLocation: widget.initialLocation,
+  );
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = ref.watch(accentProvider);
+    return MaterialApp.router(
       title: 'UniConsole',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(swatch: accent),
+      darkTheme: AppTheme.dark(swatch: accent),
       themeMode: ref.watch(themeModeProvider),
-      // 第 2 阶段替换为 go_router + AppShell。
-      home: const GalleryPage(),
+      // 外观切换整体交叉淡化（§13）。
+      themeAnimationDuration: AppMotion.appearance,
+      themeAnimationCurve: AppMotion.appearanceCurve,
+      routerConfig: _router,
     );
   }
 }

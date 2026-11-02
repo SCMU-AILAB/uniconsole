@@ -69,8 +69,8 @@ class PointCloudView extends StatelessWidget {
             ),
             if (label != null)
               Positioned(
-                left: 8,
-                top: 6,
+                left: AppSpacing.x2,
+                top: AppSpacing.x2,
                 child: Text(
                   label!,
                   style: context.type.caption.copyWith(

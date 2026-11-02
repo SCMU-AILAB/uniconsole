@@ -31,6 +31,9 @@ enum SegmentedSize {
 }
 
 /// 分段控件：灰色轨道 + 白色选中块（Main.dc.html 状态筛选）。
+///
+/// 与 UISegmentedControl 一致：只有一个选中块，切换时以弹簧滑到新位置（§13）；
+/// 每段宽度按选中态（粗体）预留，切换时文字不会跳动。
 class SegmentedControl<T> extends StatelessWidget {
   const SegmentedControl({
     super.key,
@@ -51,71 +54,128 @@ class SegmentedControl<T> extends StatelessWidget {
   final bool expand;
   final String? semanticLabel;
 
+  static const _gap = AppSpacing.half;
+  static const _segmentPadding = AppSpacing.x3;
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.type;
-    final base = size == SegmentedSize.mobile ? t.mobileFootnote : t.subhead;
-    final segments = <Widget>[];
-    for (var i = 0; i < options.length; i++) {
-      final o = options[i];
-      final on = o.value == value;
-      Widget seg = Pressable(
-        onTap: () => onChanged(o.value),
-        semanticLabel: o.semanticLabel ?? o.label,
-        selected: on,
-        focusRadius: size.radius,
-        builder: (context, st) => AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: size.height,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: on
-                ? c.segmentedSelected
-                : st.hovered
-                ? c.label.withValues(alpha: 0.05)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(size.radius),
-            boxShadow: on && !c.isDark
-                ? [
-                    BoxShadow(
-                      color: c.shadow,
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            o.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: base.copyWith(
-              color: c.label,
-              fontWeight: on ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ),
-      );
-      if (expand) seg = Expanded(child: seg);
-      if (i > 0) segments.add(const SizedBox(width: AppSpacing.xxs));
-      segments.add(seg);
-    }
+    final base = (size == SegmentedSize.mobile ? t.mobileFootnote : t.subhead)
+        .copyWith(color: c.label);
+    final bold = base.copyWith(fontWeight: FontWeight.w600);
+    final scaler = MediaQuery.textScalerOf(context);
+    final selected = options.indexWhere((o) => o.value == value);
+
     return Semantics(
       container: true,
       label: semanticLabel,
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xxs),
+        padding: const EdgeInsets.all(AppSpacing.half),
         decoration: BoxDecoration(
           color: size == SegmentedSize.mobile
               ? c.mobileControlFill
               : c.segmentedTrack,
           borderRadius: BorderRadius.circular(size.trackRadius),
         ),
-        child: Row(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          children: segments,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final gaps = _gap * (options.length - 1);
+            final List<double> widths;
+            if (expand && box.maxWidth.isFinite) {
+              final w = (box.maxWidth - gaps) / options.length;
+              widths = List.filled(options.length, w);
+            } else {
+              widths = [
+                for (final o in options)
+                  (TextPainter(
+                        text: TextSpan(text: o.label, style: bold),
+                        textDirection: TextDirection.ltr,
+                        textScaler: scaler,
+                        maxLines: 1,
+                      )..layout()).width.ceilToDouble() +
+                      _segmentPadding * 2,
+              ];
+            }
+            var left = 0.0;
+            for (var i = 0; i < selected; i++) {
+              left += widths[i] + _gap;
+            }
+
+            return SizedBox(
+              width: widths.fold<double>(0, (a, w) => a + w) + gaps,
+              height: size.height,
+              child: Stack(
+                children: [
+                  if (selected >= 0)
+                    AnimatedPositioned(
+                      duration: AppMotion.move(context, AppMotion.snappy),
+                      curve: AppMotion.snappy,
+                      left: left,
+                      top: 0,
+                      bottom: 0,
+                      width: widths[selected],
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: c.segmentedSelected,
+                          borderRadius: BorderRadius.circular(size.radius),
+                          boxShadow: c.isDark
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: c.shadow,
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                        ),
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      for (var i = 0; i < options.length; i++) ...[
+                        if (i > 0) const SizedBox(width: _gap),
+                        SizedBox(
+                          width: widths[i],
+                          child: Pressable(
+                            onTap: () => onChanged(options[i].value),
+                            semanticLabel:
+                                options[i].semanticLabel ?? options[i].label,
+                            selected: i == selected,
+                            focusRadius: size.radius,
+                            builder: (context, st) => AnimatedContainer(
+                              duration: AppMotion.fade(pressed: st.pressed),
+                              curve: AppMotion.highlightCurve,
+                              height: size.height,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: st.pressed && i != selected
+                                    ? c.label.withValues(alpha: 0.06)
+                                    : c.label.withValues(alpha: 0),
+                                borderRadius: BorderRadius.circular(
+                                  size.radius,
+                                ),
+                              ),
+                              child: AnimatedDefaultTextStyle(
+                                duration: AppMotion.highlight,
+                                style: i == selected ? bold : base,
+                                child: Text(
+                                  options[i].label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
+                                  softWrap: false,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -152,7 +212,7 @@ class SearchField extends StatelessWidget {
     return Container(
       width: width,
       height: mobile ? 36 : 28,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
       decoration: BoxDecoration(
         color: mobile ? c.mobileControlFill : c.segmentedTrack,
         borderRadius: BorderRadius.circular(
@@ -162,7 +222,7 @@ class SearchField extends StatelessWidget {
       child: Row(
         children: [
           AppIcon(AppIcons.search, size: mobile ? 16 : 14, strokeWidth: 2),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpacing.x2),
           Expanded(
             child: Semantics(
               label: semanticLabel,
@@ -212,25 +272,29 @@ class AppSwitch extends StatelessWidget {
         focusRadius: 11,
         builder: (context, st) => Opacity(
           opacity: st.enabled ? 1 : 0.45,
+          // 轨道颜色淡入，圆钮以弹簧滑动；按住时圆钮横向拉长（UISwitch 的按压反馈）。
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            duration: AppMotion.highlight * 1.5,
+            curve: AppMotion.highlightCurve,
             width: 38,
             height: 22,
-            padding: const EdgeInsets.all(2),
+            padding: const EdgeInsets.all(AppSpacing.half),
             decoration: BoxDecoration(
               color: value ? c.switchOn : c.separator,
               borderRadius: BorderRadius.circular(11),
             ),
             child: AnimatedAlign(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOut,
+              duration: AppMotion.move(context, AppMotion.snappy),
+              curve: AppMotion.snappy,
               alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                width: 18,
+              child: AnimatedContainer(
+                duration: AppMotion.move(context, AppMotion.snappy),
+                curve: AppMotion.snappy,
+                width: st.pressed && !AppMotion.reduced(context) ? 22 : 18,
                 height: 18,
                 decoration: BoxDecoration(
                   color: c.knob,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(9),
                   boxShadow: [
                     BoxShadow(
                       color: c.shadow,
@@ -278,27 +342,37 @@ class AppCheckbox extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
+              AnimatedContainer(
+                duration: AppMotion.highlight,
+                curve: AppMotion.highlightCurve,
                 width: 16,
                 height: 16,
                 decoration: BoxDecoration(
                   color: value ? c.accent : c.surface,
                   borderRadius: BorderRadius.circular(4),
-                  border: value
-                      ? null
-                      : Border.all(color: c.controlBorder, width: 1.2),
+                  border: Border.all(
+                    color: value ? c.accent : c.controlBorder,
+                    width: 1.2,
+                  ),
                 ),
-                child: value
-                    ? AppIcon(
-                        AppIcons.check,
-                        size: 14,
-                        color: c.onAccent,
-                        strokeWidth: 2.8,
-                      )
-                    : null,
+                child: AnimatedScale(
+                  duration: AppMotion.move(context, AppMotion.snappy),
+                  curve: AppMotion.snappy,
+                  scale: value ? 1 : 0.4,
+                  child: AnimatedOpacity(
+                    duration: AppMotion.highlight,
+                    opacity: value ? 1 : 0,
+                    child: AppIcon(
+                      AppIcons.check,
+                      size: 14,
+                      color: c.onAccent,
+                      strokeWidth: 2.8,
+                    ),
+                  ),
+                ),
               ),
               if (label != null) ...[
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.x2),
                 ExcludeSemantics(
                   child: Text(
                     label!,
@@ -346,30 +420,37 @@ class AppRadio<T> extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
+              AnimatedContainer(
+                duration: AppMotion.highlight,
+                curve: AppMotion.highlightCurve,
                 width: 16,
                 height: 16,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: on ? c.accent : c.surface,
                   shape: BoxShape.circle,
-                  border: on
-                      ? null
-                      : Border.all(color: c.controlBorder, width: 1.2),
+                  border: Border.all(
+                    color: on ? c.accent : c.controlBorder,
+                    width: 1.2,
+                  ),
                 ),
-                child: on
-                    ? Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: c.onAccent,
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                    : null,
+                // 选中时中心白点以弹簧放大出现。
+                child: AnimatedScale(
+                  duration: AppMotion.move(context, AppMotion.snappy),
+                  curve: AppMotion.snappy,
+                  scale: on ? 1 : 0,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: c.onAccent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
               ),
               if (label != null) ...[
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.x2),
                 ExcludeSemantics(
                   child: Text(
                     label!,

@@ -357,10 +357,69 @@ class AppColors extends ThemeExtension<AppColors> {
     );
   }
 
-  /// 浅色/深色切换不做逐色插值，直接切换。
+  /// 浅色 / 深色切换时逐色插值，配合 MaterialApp 的主题动画做交叉淡化（§13）。
   @override
-  AppColors lerp(AppColors? other, double t) =>
-      other == null || t < 0.5 ? this : other;
+  AppColors lerp(AppColors? other, double t) {
+    if (other == null) return this;
+    Color l(Color a, Color b) => Color.lerp(a, b, t)!;
+    return AppColors(
+      brightness: t < 0.5 ? brightness : other.brightness,
+      windowBackground: l(windowBackground, other.windowBackground),
+      surface: l(surface, other.surface),
+      toolbarBackground: l(toolbarBackground, other.toolbarBackground),
+      sidebarBackground: l(sidebarBackground, other.sidebarBackground),
+      sidebarSelected: l(sidebarSelected, other.sidebarSelected),
+      sidebarBorder: l(sidebarBorder, other.sidebarBorder),
+      sidebarUserCard: l(sidebarUserCard, other.sidebarUserCard),
+      separator: l(separator, other.separator),
+      separatorSubtle: l(separatorSubtle, other.separatorSubtle),
+      fillSecondary: l(fillSecondary, other.fillSecondary),
+      segmentedTrack: l(segmentedTrack, other.segmentedTrack),
+      segmentedSelected: l(segmentedSelected, other.segmentedSelected),
+      controlBorder: l(controlBorder, other.controlBorder),
+      label: l(label, other.label),
+      secondaryLabel: l(secondaryLabel, other.secondaryLabel),
+      tertiaryLabel: l(tertiaryLabel, other.tertiaryLabel),
+      decorativeGray: l(decorativeGray, other.decorativeGray),
+      decorativeGrayLight: l(decorativeGrayLight, other.decorativeGrayLight),
+      accent: l(accent, other.accent),
+      accentFill: l(accentFill, other.accentFill),
+      accentRing: l(accentRing, other.accentRing),
+      onAccent: l(onAccent, other.onAccent),
+      link: l(link, other.link),
+      emergency: l(emergency, other.emergency),
+      emergencyReleased: l(emergencyReleased, other.emergencyReleased),
+      rowSelected: l(rowSelected, other.rowSelected),
+      switchOn: l(switchOn, other.switchOn),
+      badge: l(badge, other.badge),
+      logo: l(logo, other.logo),
+      onLogo: l(onLogo, other.onLogo),
+      mobileBackground: l(mobileBackground, other.mobileBackground),
+      mobileControlFill: l(mobileControlFill, other.mobileControlFill),
+      tabBarBackground: l(tabBarBackground, other.tabBarBackground),
+      tabBarBorder: l(tabBarBorder, other.tabBarBorder),
+      chartBackground: l(chartBackground, other.chartBackground),
+      mapBackground: l(mapBackground, other.mapBackground),
+      mapGrid: l(mapGrid, other.mapGrid),
+      mapWall: l(mapWall, other.mapWall),
+      mapRoomFill: l(mapRoomFill, other.mapRoomFill),
+      mapOverlay: l(mapOverlay, other.mapOverlay),
+      videoBackground: l(videoBackground, other.videoBackground),
+      pointCloudBackground: l(pointCloudBackground, other.pointCloudBackground),
+      hudOverlay: l(hudOverlay, other.hudOverlay),
+      hudText: l(hudText, other.hudText),
+      hudSecondary: l(hudSecondary, other.hudSecondary),
+      hudTertiary: l(hudTertiary, other.hudTertiary),
+      hudBorder: l(hudBorder, other.hudBorder),
+      hudSelected: l(hudSelected, other.hudSelected),
+      live: l(live, other.live),
+      cloudNear: l(cloudNear, other.cloudNear),
+      cloudMid: l(cloudMid, other.cloudMid),
+      cloudFar: l(cloudFar, other.cloudFar),
+      shadow: l(shadow, other.shadow),
+      avatarPalette: t < 0.5 ? avatarPalette : other.avatarPalette,
+    );
+  }
 }
 
 @immutable

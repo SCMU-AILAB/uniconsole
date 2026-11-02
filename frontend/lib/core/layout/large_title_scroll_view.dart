@@ -82,12 +82,17 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
   double get maxExtent => topPadding + barHeight + largeHeight;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     final c = colors;
     final t = (shrinkOffset / largeHeight).clamp(0.0, 1.0);
     final collapsed = t >= 1;
     // 内容滚到标题栏下面时才出现背景（iOS 的 scrollEdgeAppearance）。
-    final showBar = collapsed && (overlapsContent || shrinkOffset > largeHeight);
+    final showBar =
+        collapsed && (overlapsContent || shrinkOffset > largeHeight);
 
     // 标题按整屏居中，两侧各留 88pt 给返回按钮和操作按钮。
     final bar = SizedBox(
@@ -99,7 +104,7 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
             right: 88,
             child: Center(
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
+                duration: AppMotion.highlight,
                 opacity: collapsed ? 1 : 0,
                 child: ExcludeSemantics(
                   excluding: !collapsed,
@@ -107,7 +112,10 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: type.mobileBodyLarge.copyWith(color: c.label, fontWeight: FontWeight.w600),
+                    style: type.mobileBodyLarge.copyWith(
+                      color: c.label,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -115,14 +123,14 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
           ),
           Row(
             children: [
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.x2),
               ?leading,
               const Spacer(),
               for (var i = 0; i < actions.length; i++) ...[
-                if (i > 0) const SizedBox(width: AppSpacing.md),
+                if (i > 0) const SizedBox(width: AppSpacing.x2),
                 actions[i],
               ],
-              const SizedBox(width: AppSpacing.xxl),
+              const SizedBox(width: AppSpacing.x4),
             ],
           ),
         ],
@@ -131,15 +139,10 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
 
     final content = Stack(
       children: [
+        Positioned(left: 0, right: 0, top: topPadding, child: bar),
         Positioned(
-          left: 0,
-          right: 0,
-          top: topPadding,
-          child: bar,
-        ),
-        Positioned(
-          left: AppSpacing.xxl,
-          right: AppSpacing.xxl,
+          left: AppSpacing.x4,
+          right: AppSpacing.x4,
           top: topPadding + barHeight - shrinkOffset.clamp(0, largeHeight),
           height: largeHeight,
           child: Opacity(
@@ -149,7 +152,12 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
               excludeSemantics: collapsed,
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: type.largeTitle.copyWith(color: c.label)),
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: type.largeTitle.copyWith(color: c.label),
+                ),
               ),
             ),
           ),
@@ -162,11 +170,17 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
         enabled: showBar,
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: AppMotion.highlight,
           decoration: BoxDecoration(
-            color: showBar ? c.tabBarBackground : c.mobileBackground.withValues(alpha: 0),
+            color: showBar
+                ? c.tabBarBackground
+                : c.mobileBackground.withValues(alpha: 0),
             border: Border(
-              bottom: BorderSide(color: showBar ? c.tabBarBorder : c.tabBarBorder.withValues(alpha: 0)),
+              bottom: BorderSide(
+                color: showBar
+                    ? c.tabBarBorder
+                    : c.tabBarBorder.withValues(alpha: 0),
+              ),
             ),
           ),
           child: content,

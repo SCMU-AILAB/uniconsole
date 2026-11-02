@@ -52,6 +52,16 @@ void _scrollMain(double offset) {
   best?.jumpTo(offset.clamp(0, best!.maxScrollExtent));
 }
 
-/// 仅 debug：`UNICONSOLE_THEME=dark` 启动时直接进入深色，便于截图对照。
-bool get debugStartDark =>
-    kDebugMode && !kIsWeb && Platform.environment['UNICONSOLE_THEME'] == 'dark';
+/// 仅 debug：`UNICONSOLE_THEME=light|dark` 启动时固定外观（默认跟随系统），便于截图对照。
+String? get debugThemeOverride {
+  if (!kDebugMode || kIsWeb) return null;
+  final v = Platform.environment['UNICONSOLE_THEME'];
+  return v == 'light' || v == 'dark' ? v : null;
+}
+
+/// 仅 debug：`UNICONSOLE_ROUTE=/settings` 启动时直接打开指定页面。
+String? get debugInitialRoute {
+  if (!kDebugMode || kIsWeb) return null;
+  final v = Platform.environment['UNICONSOLE_ROUTE'];
+  return v == null || v.isEmpty ? null : v;
+}

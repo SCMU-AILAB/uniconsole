@@ -92,7 +92,7 @@ class AppSidebar extends StatelessWidget {
 
     final children = <Widget>[
       Padding(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 6),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 0 : AppSpacing.x2),
         child: compact
             ? Center(
                 child: Tooltip(message: title, child: brand),
@@ -100,13 +100,13 @@ class AppSidebar extends StatelessWidget {
             : Row(
                 children: [
                   brand,
-                  const SizedBox(width: AppSpacing.lg),
+                  const SizedBox(width: AppSpacing.x3),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(title, style: t.headline.copyWith(color: c.label)),
-                        const SizedBox(height: 1),
+                        const SizedBox(height: AppSpacing.half),
                         Text(
                           subtitle,
                           style: t.caption.copyWith(color: c.secondaryLabel),
@@ -120,16 +120,23 @@ class AppSidebar extends StatelessWidget {
     ];
 
     for (final section in sections) {
-      children.add(const SizedBox(height: 18));
+      children.add(const SizedBox(height: AppSpacing.x4));
       if (section.title != null) {
         children.add(
           compact
               ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.x2,
+                  ),
                   child: Container(height: 1, color: c.sidebarBorder),
                 )
               : Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.x3,
+                    0,
+                    AppSpacing.x3,
+                    AppSpacing.x1,
+                  ),
                   child: Semantics(
                     header: true,
                     child: Text(
@@ -144,7 +151,7 @@ class AppSidebar extends StatelessWidget {
       for (final item in section.items) {
         children.add(
           Padding(
-            padding: const EdgeInsets.only(bottom: 1),
+            padding: const EdgeInsets.only(bottom: AppSpacing.half),
             child: _SidebarTile(
               item: item,
               selected: item.id == selectedId,
@@ -171,21 +178,21 @@ class AppSidebar extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: EdgeInsets.fromLTRB(
-                  compact ? 10 : 12,
-                  14 + topInset,
-                  compact ? 10 : 12,
-                  16,
+                  AppSpacing.x3,
+                  AppSpacing.x4 + topInset,
+                  AppSpacing.x3,
+                  AppSpacing.x4,
                 ),
                 children: children,
               ),
             ),
             if (user != null)
               Padding(
-                padding: EdgeInsets.fromLTRB(
-                  compact ? 10 : 12,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.x3,
                   0,
-                  compact ? 10 : 12,
-                  16,
+                  AppSpacing.x3,
+                  AppSpacing.x4,
                 ),
                 child: compact
                     ? Tooltip(
@@ -197,7 +204,7 @@ class AppSidebar extends StatelessWidget {
                         ),
                       )
                     : Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: const EdgeInsets.all(AppSpacing.x2),
                         decoration: BoxDecoration(
                           color: c.sidebarUserCard,
                           borderRadius: BorderRadius.circular(AppRadius.group),
@@ -209,7 +216,7 @@ class AppSidebar extends StatelessWidget {
                               size: 30,
                               color: user!.color,
                             ),
-                            const SizedBox(width: AppSpacing.lg),
+                            const SizedBox(width: AppSpacing.x3),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,11 +295,12 @@ class _SidebarTile extends StatelessWidget {
       tooltip: compact ? item.label : null,
       focusRadius: AppRadius.sm,
       builder: (context, st) {
+        // macOS 侧边栏没有悬停态；选中是瞬时的（不滑动、不渐变）。
         final bg = selected
             ? c.sidebarSelected
-            : st.hovered
+            : st.pressed
             ? c.sidebarSelected.withValues(alpha: 0.5)
-            : Colors.transparent;
+            : c.sidebarSelected.withValues(alpha: 0);
         if (compact) {
           return Container(
             height: 36,
@@ -307,8 +315,8 @@ class _SidebarTile extends StatelessWidget {
                 leading,
                 if (item.badge != null)
                   Positioned(
-                    top: 2,
-                    right: 4,
+                    top: AppSpacing.half,
+                    right: AppSpacing.x1,
                     child: CountBadge(item.badge!, small: true),
                   ),
               ],
@@ -317,7 +325,7 @@ class _SidebarTile extends StatelessWidget {
         }
         return Container(
           height: AppSizes.navItemHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -325,7 +333,7 @@ class _SidebarTile extends StatelessWidget {
           child: Row(
             children: [
               leading,
-              const SizedBox(width: AppSpacing.lg),
+              const SizedBox(width: AppSpacing.x3),
               Expanded(
                 child: Text(
                   item.label,
@@ -375,7 +383,7 @@ class AppToolbar extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: AppSizes.toolbarMinHeight),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.section,
-        vertical: AppSpacing.md,
+        vertical: AppSpacing.x2,
       ),
       decoration: BoxDecoration(
         color: c.toolbarBackground,
@@ -388,7 +396,7 @@ class AppToolbar extends StatelessWidget {
             children: [
               if (leading != null) ...[
                 leading!,
-                const SizedBox(width: AppSpacing.lg),
+                const SizedBox(width: AppSpacing.x3),
               ],
               Flexible(
                 child: Column(
@@ -419,8 +427,8 @@ class AppToolbar extends StatelessWidget {
           }
           Widget wrap(WrapAlignment a) => Wrap(
             alignment: a,
-            spacing: AppSpacing.xl,
-            runSpacing: AppSpacing.md,
+            spacing: AppSpacing.x3,
+            runSpacing: AppSpacing.x2,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: actions,
           );
@@ -430,7 +438,7 @@ class AppToolbar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 heading,
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.x2),
                 wrap(WrapAlignment.start),
               ],
             );
@@ -438,7 +446,7 @@ class AppToolbar extends StatelessWidget {
           return Row(
             children: [
               Expanded(child: heading),
-              const SizedBox(width: AppSpacing.xl),
+              const SizedBox(width: AppSpacing.x3),
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: box.maxWidth * 0.72),
                 child: wrap(WrapAlignment.end),
@@ -496,8 +504,8 @@ class MobileTabBar extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           padding: EdgeInsets.only(
-            top: 7,
-            bottom: bottom > 0 ? bottom : AppSpacing.md,
+            top: AppSpacing.x2,
+            bottom: bottom > 0 ? bottom : AppSpacing.x2,
           ),
           decoration: BoxDecoration(
             color: c.tabBarBackground,
@@ -532,7 +540,7 @@ class MobileTabBar extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   AppIcon(it.icon, size: 24, color: color),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: AppSpacing.x1),
                                   Text(
                                     it.label,
                                     style: context.type.tabLabel.copyWith(

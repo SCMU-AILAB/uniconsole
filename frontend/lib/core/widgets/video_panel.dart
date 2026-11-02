@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'motion.dart';
 import 'pressable.dart';
 
 /// 视频面板（Control.dc.html）：深色底 + 十字准星 + 四角 HUD 插槽。
@@ -49,7 +50,7 @@ class VideoPanel extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, box) {
                 final narrow = box.maxWidth < 420;
-                final inset = narrow ? 8.0 : 14.0;
+                final inset = narrow ? AppSpacing.x2 : AppSpacing.x4;
                 return Stack(
                   children: [
                     if (video != null)
@@ -85,13 +86,12 @@ class VideoPanel extends StatelessWidget {
                         bottom: inset,
                         child: bottomRight!,
                       ),
-                    if (overlay != null)
-                      Positioned(
-                        left: inset,
-                        right: inset,
-                        top: narrow ? 48 : 60,
-                        child: Center(child: overlay!),
-                      ),
+                    Positioned(
+                      left: inset,
+                      right: inset,
+                      top: narrow ? 48 : 60,
+                      child: Center(child: PopIn(child: overlay)),
+                    ),
                   ],
                 );
               },
@@ -144,7 +144,7 @@ class HudPanel extends StatelessWidget {
   const HudPanel({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(3),
+    this.padding = const EdgeInsets.all(AppSpacing.x1),
   });
 
   final Widget child;
@@ -177,7 +177,7 @@ class LiveIndicator extends StatelessWidget {
     final c = context.colors;
     final t = context.type;
     return HudPanel(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
       child: SizedBox(
         height: 32,
         child: Row(
@@ -188,10 +188,10 @@ class LiveIndicator extends StatelessWidget {
               height: 7,
               decoration: BoxDecoration(color: c.live, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: AppSpacing.x1),
             Text('LIVE', style: t.subhead.copyWith(color: c.hudText)),
             if (detail != null) ...[
-              const SizedBox(width: AppSpacing.lg),
+              const SizedBox(width: AppSpacing.x3),
               Flexible(
                 child: Text(
                   detail!,
@@ -227,12 +227,12 @@ class HudMetrics extends StatelessWidget {
     final t = context.type;
     return HudPanel(
       padding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: AppSpacing.lg,
+        horizontal: AppSpacing.x4,
+        vertical: AppSpacing.x3,
       ),
       child: Wrap(
-        spacing: AppSpacing.xxl,
-        runSpacing: AppSpacing.sm,
+        spacing: AppSpacing.x4,
+        runSpacing: AppSpacing.x2,
         children: [
           for (final m in metrics)
             Column(
@@ -240,7 +240,7 @@ class HudMetrics extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(m.label, style: t.caption.copyWith(color: c.hudSecondary)),
-                const SizedBox(height: AppSpacing.xxs),
+                const SizedBox(height: AppSpacing.half),
                 Text(m.value, style: t.metric.copyWith(color: c.hudText)),
               ],
             ),
@@ -276,24 +276,26 @@ class HudSegmented<T> extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             for (var i = 0; i < options.length; i++) ...[
-              if (i > 0) const SizedBox(width: AppSpacing.xs),
+              if (i > 0) const SizedBox(width: AppSpacing.x1),
               Pressable(
                 onTap: () => onChanged(options[i].$1),
                 selected: options[i].$1 == value,
                 semanticLabel: options[i].$2,
                 focusRadius: AppRadius.xs,
-                builder: (context, st) => Container(
+                builder: (context, st) => AnimatedContainer(
+                  duration: AppMotion.fade(pressed: st.pressed),
+                  curve: AppMotion.highlightCurve,
                   height: 26,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
+                    horizontal: AppSpacing.x3,
                   ),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: options[i].$1 == value
                         ? c.hudSelected
-                        : st.hovered
+                        : st.pressed
                         ? c.hudBorder
-                        : Colors.transparent,
+                        : c.hudBorder.withValues(alpha: 0),
                     borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                   child: Text(

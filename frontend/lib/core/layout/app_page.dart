@@ -51,6 +51,18 @@ class AppPage extends StatelessWidget {
     return size.isMobile ? _mobile(context) : _desktop(context, size);
   }
 
+  /// 从「我的」等入口 push 进来的页面显示返回按钮。
+  Widget? _back(BuildContext context, {required bool mobile}) {
+    final canPop = ModalRoute.of(context)?.canPop ?? false;
+    if (!canPop) return null;
+    return AppIconButton(
+      icon: AppIcons.chevronLeft,
+      label: '返回',
+      style: mobile ? IconButtonStyle.circle : IconButtonStyle.plain,
+      onPressed: () => Navigator.of(context).maybePop(),
+    );
+  }
+
   List<Widget> _spaced(List<Widget> items) => [
     for (var i = 0; i < items.length; i++) ...[
       if (i > 0) SizedBox(height: gap),
@@ -81,7 +93,12 @@ class AppPage extends StatelessWidget {
     final sideBySide = inspector != null && size == LayoutSize.wide;
 
     final content = SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.section, AppSpacing.page, 28),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        AppSpacing.section,
+        AppSpacing.page,
+        28,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: _spaced([
@@ -95,7 +112,12 @@ class AppPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (band > 0) Container(height: band, color: c.toolbarBackground),
-        AppToolbar(title: title, subtitle: subtitle, actions: actions),
+        AppToolbar(
+          title: title,
+          subtitle: subtitle,
+          leading: _back(context, mobile: false),
+          actions: actions,
+        ),
         Expanded(child: content),
       ],
     );
@@ -115,7 +137,12 @@ class AppPage extends StatelessWidget {
               border: Border(left: BorderSide(color: c.separator)),
             ),
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(AppSpacing.section, AppSpacing.section + band, AppSpacing.section, AppSpacing.section),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.section,
+                AppSpacing.section + band,
+                AppSpacing.section,
+                AppSpacing.section,
+              ),
               child: inspector,
             ),
           ),
@@ -129,16 +156,27 @@ class AppPage extends StatelessWidget {
     final bottom = MediaQuery.paddingOf(context).bottom;
     return LargeTitleScrollView(
       title: mobileTitle ?? title,
+      leading: _back(context, mobile: true),
       actions: mobileActions,
       slivers: [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(AppSpacing.xxl, 0, AppSpacing.xxl, bottom + AppSpacing.page),
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.x4,
+            0,
+            AppSpacing.x4,
+            bottom + AppSpacing.page,
+          ),
           sliver: SliverList.list(
             children: [
               if (subtitle != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-                  child: Text(subtitle!, style: context.type.mobileFootnote.copyWith(color: c.secondaryLabel)),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+                  child: Text(
+                    subtitle!,
+                    style: context.type.mobileFootnote.copyWith(
+                      color: c.secondaryLabel,
+                    ),
+                  ),
                 ),
               ..._spaced([
                 ...children,

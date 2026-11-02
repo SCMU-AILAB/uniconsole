@@ -7,6 +7,7 @@ export 'floor_map_view.dart';
 export 'grouped_list.dart';
 export 'joystick.dart';
 export 'log_console.dart';
+export 'motion.dart';
 export 'navigation.dart';
 export 'point_cloud_view.dart';
 export 'pressable.dart';

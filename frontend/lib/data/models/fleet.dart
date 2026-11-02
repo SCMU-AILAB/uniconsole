@@ -5,7 +5,12 @@ enum Formation { line, column, v, grid }
 /// 联调时间轴上的一个动作块。
 @immutable
 class TrackAction {
-  const TrackAction({required this.deviceId, required this.start, required this.end, required this.action});
+  const TrackAction({
+    required this.deviceId,
+    required this.start,
+    required this.end,
+    required this.action,
+  });
 
   final String deviceId;
   final Duration start;

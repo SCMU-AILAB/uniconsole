@@ -81,15 +81,14 @@ class _AppButton extends StatelessWidget {
       semanticLabel: label,
       focusRadius: size.radius,
       builder: (context, st) {
-        var fill = bg;
-        if (st.pressed) {
-          fill = Color.lerp(bg, c.stateOverlay, 0.14)!;
-        } else if (st.hovered) {
-          fill = Color.lerp(bg, c.stateOverlay, 0.06)!;
-        }
-        return Opacity(
+        // macOS 带底色 / 描边的按钮没有悬停态；按下即时加深，松开渐隐（§13）。
+        final fill = st.pressed ? Color.lerp(bg, c.stateOverlay, 0.14)! : bg;
+        return AnimatedOpacity(
+          duration: AppMotion.highlight,
           opacity: st.enabled ? 1 : 0.45,
-          child: Container(
+          child: AnimatedContainer(
+            duration: AppMotion.fade(pressed: st.pressed),
+            curve: AppMotion.highlightCurve,
             height: size.height,
             padding: EdgeInsets.symmetric(horizontal: size.padding),
             decoration: BoxDecoration(
@@ -108,7 +107,7 @@ class _AppButton extends StatelessWidget {
                     color: fg,
                     strokeWidth: 2.2,
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.x2),
                 ],
                 Flexible(
                   child: Text(
@@ -119,7 +118,7 @@ class _AppButton extends StatelessWidget {
                   ),
                 ),
                 if (trailingIcon != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
+                  const SizedBox(width: AppSpacing.x1),
                   AppIcon(
                     trailingIcon!,
                     size: 11,
@@ -258,12 +257,11 @@ class EmergencyStopButton extends StatelessWidget {
       focusRadius: AppRadius.lg,
       builder: (context, st) {
         final base = engaged ? c.emergencyReleased : c.emergency;
-        final bg = st.pressed
-            ? Color.lerp(base, c.pressShade, 0.18)!
-            : st.hovered
-            ? Color.lerp(base, c.pressShade, 0.08)!
-            : base;
-        return Container(
+        final bg = st.pressed ? Color.lerp(base, c.pressShade, 0.18)! : base;
+        // 急停是安全操作：按下反馈即时，触发 / 解除的颜色切换只做极短渐变。
+        return AnimatedContainer(
+          duration: AppMotion.fade(pressed: st.pressed),
+          curve: AppMotion.highlightCurve,
           height: compact ? 32 : 36,
           padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
           decoration: BoxDecoration(
@@ -288,7 +286,7 @@ class EmergencyStopButton extends StatelessWidget {
                 color: c.onAccent,
                 strokeWidth: 2,
               ),
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.x2),
               Text(
                 text,
                 style: context.type.body.copyWith(
@@ -305,7 +303,8 @@ class EmergencyStopButton extends StatelessWidget {
 }
 
 enum IconButtonStyle {
-  /// 透明底，悬停显示灰底（工具栏、侧边栏用户卡）
+  /// 透明底，悬停显示灰底（工具栏、侧边栏用户卡）。
+  /// 只有这种无边框按钮有悬停态，与 macOS 工具栏按钮一致。
   plain,
 
   /// 灰底圆形（移动端导航栏，36×36）
@@ -362,20 +361,22 @@ class AppIconButton extends StatelessWidget {
           IconButtonStyle.filled => c.fillSecondary,
           IconButtonStyle.primary => c.accentFill,
         };
-        final bg = st.pressed
-            ? Color.lerp(
-                rest == Colors.transparent ? c.fillSecondary : rest,
-                c.label,
-                0.1,
-              )!
-            : st.hovered
-            ? (rest == Colors.transparent
-                  ? c.fillSecondary
-                  : Color.lerp(rest, c.label, 0.05)!)
-            : rest;
-        return Opacity(
+        final transparent = style == IconButtonStyle.plain && !selected;
+        final Color bg;
+        if (st.pressed) {
+          bg = Color.lerp(transparent ? c.fillSecondary : rest, c.label, 0.1)!;
+        } else if (st.hovered && transparent) {
+          bg = c.fillSecondary;
+        } else {
+          // 透明底也用同色 0 透明度，保证颜色渐变时不经过黑色。
+          bg = transparent ? c.fillSecondary.withValues(alpha: 0) : rest;
+        }
+        return AnimatedOpacity(
+          duration: AppMotion.highlight,
           opacity: st.enabled ? 1 : 0.45,
-          child: Container(
+          child: AnimatedContainer(
+            duration: AppMotion.fade(pressed: st.pressed),
+            curve: AppMotion.highlightCurve,
             width: dim,
             height: dim,
             alignment: Alignment.center,

@@ -101,6 +101,15 @@ class StatusColors extends ThemeExtension<StatusColors> {
   StatusColors copyWith() => this;
 
   @override
-  StatusColors lerp(StatusColors? other, double t) =>
-      other == null || t < 0.5 ? this : other;
+  StatusColors lerp(StatusColors? other, double t) {
+    if (other == null) return this;
+    return StatusColors({
+      for (final tone in StatusTone.values)
+        tone: StatusSwatch(
+          dot: Color.lerp(of(tone).dot, other.of(tone).dot, t)!,
+          fg: Color.lerp(of(tone).fg, other.of(tone).fg, t)!,
+          bg: Color.lerp(of(tone).bg, other.of(tone).bg, t)!,
+        ),
+    });
+  }
 }

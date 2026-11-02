@@ -152,7 +152,7 @@ class TimelineTrack extends StatelessWidget {
                                 builder: (context, st) => Container(
                                   height: 22,
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
+                                    horizontal: AppSpacing.x2,
                                   ),
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
@@ -205,7 +205,7 @@ class TimelineTrack extends StatelessWidget {
                             child: _isBlock(tr)
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 5,
+                                      horizontal: AppSpacing.x1,
                                     ),
                                     alignment: Alignment.centerLeft,
                                     decoration: BoxDecoration(
@@ -251,7 +251,7 @@ class TimelineTrack extends StatelessWidget {
 
         final spaced = <Widget>[];
         for (var i = 0; i < rows.length; i++) {
-          if (i > 0) spaced.add(const SizedBox(height: 5));
+          if (i > 0) spaced.add(const SizedBox(height: AppSpacing.x1));
           spaced.add(rows[i]);
         }
 

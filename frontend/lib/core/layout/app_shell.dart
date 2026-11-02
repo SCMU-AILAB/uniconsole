@@ -39,12 +39,32 @@ class AppShell extends StatelessWidget {
     final c = context.colors;
     final size = LayoutSize.of(MediaQuery.sizeOf(context).width);
 
+    final band = WindowChrome.titlebarHeight;
+
     if (size.isMobile) {
+      // macOS 窗口拉窄到移动布局时，把标题栏高度当作顶部安全区，避开红黄绿按钮。
+      final mq = MediaQuery.of(context);
+      final padded = mq.padding.top >= band
+          ? child
+          : MediaQuery(
+              data: mq.copyWith(padding: mq.padding.copyWith(top: band)),
+              child: child,
+            );
       return Scaffold(
         backgroundColor: c.mobileBackground,
         // 内容延伸到半透明标签栏下方；页面按 MediaQuery 底部内边距留白。
         extendBody: true,
-        body: child,
+        body: Stack(
+          children: [
+            Positioned.fill(child: padded),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: WindowDragArea(height: band),
+            ),
+          ],
+        ),
         bottomNavigationBar: MobileTabBar(
           items: tabs,
           selectedId: selectedTabId,
@@ -53,7 +73,6 @@ class AppShell extends StatelessWidget {
       );
     }
 
-    final band = WindowChrome.titlebarHeight;
     return Scaffold(
       backgroundColor: c.windowBackground,
       body: Stack(
@@ -74,7 +93,12 @@ class AppShell extends StatelessWidget {
             ],
           ),
           // macOS 标题栏区域：拖动窗口、双击缩放。
-          Positioned(left: 0, right: 0, top: 0, child: WindowDragArea(height: band)),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: WindowDragArea(height: band),
+          ),
         ],
       ),
     );
