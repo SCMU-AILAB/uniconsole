@@ -18,6 +18,7 @@ class VideoPanel extends StatelessWidget {
     this.bottomRight,
     this.overlay,
     this.showCrosshair = true,
+    this.hideBottomRightWhenNarrow = true,
     this.aspectRatio = 16 / 9,
     this.semanticLabel = '实时视频',
   });
@@ -32,6 +33,9 @@ class VideoPanel extends StatelessWidget {
   /// 顶部居中的提示（急停横幅）。
   final Widget? overlay;
   final bool showCrosshair;
+
+  /// 窄于 420 时隐藏右下角（默认用于雷达小窗）；移动端的「横屏操控」按钮需要保留。
+  final bool hideBottomRightWhenNarrow;
   final double aspectRatio;
   final String semanticLabel;
 
@@ -80,7 +84,8 @@ class VideoPanel extends StatelessWidget {
                           child: bottomLeft!,
                         ),
                       ),
-                    if (bottomRight != null && !narrow)
+                    if (bottomRight != null &&
+                        !(narrow && hideBottomRightWhenNarrow))
                       Positioned(
                         right: inset,
                         bottom: inset,

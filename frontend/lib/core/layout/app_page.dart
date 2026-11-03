@@ -22,6 +22,10 @@ class AppPage extends StatelessWidget {
     this.inspector,
     this.inspectorLabel,
     this.gap = AppSpacing.section,
+    this.largeTitle = true,
+    this.backLabel,
+    this.toolbarTitle,
+    this.titleAccessory,
   });
 
   /// 桌面工具栏标题。
@@ -45,9 +49,21 @@ class AppPage extends StatelessWidget {
   final String? inspectorLabel;
   final double gap;
 
+  /// 移动端是否使用大标题；二级页面用 false（内联 17pt 标题）。
+  final bool largeTitle;
+
+  /// 移动端返回按钮上显示的上一级标题（iOS「‹ 设备」）。
+  final String? backLabel;
+
+  /// 桌面工具栏的自定义标题区。
+  final Widget? toolbarTitle;
+
+  /// 桌面工具栏标题右侧的附件。
+  final Widget? titleAccessory;
+
   @override
   Widget build(BuildContext context) {
-    final size = LayoutSize.of(MediaQuery.sizeOf(context).width);
+    final size = LayoutSize.ofContext(context);
     return size.isMobile ? _mobile(context) : _desktop(context, size);
   }
 
@@ -55,10 +71,10 @@ class AppPage extends StatelessWidget {
   Widget? _back(BuildContext context, {required bool mobile}) {
     final canPop = ModalRoute.of(context)?.canPop ?? false;
     if (!canPop) return null;
+    if (mobile) return _BackLink(label: backLabel);
     return AppIconButton(
       icon: AppIcons.chevronLeft,
       label: '返回',
-      style: mobile ? IconButtonStyle.circle : IconButtonStyle.plain,
       onPressed: () => Navigator.of(context).maybePop(),
     );
   }
@@ -114,6 +130,8 @@ class AppPage extends StatelessWidget {
         if (band > 0) Container(height: band, color: c.toolbarBackground),
         AppToolbar(
           title: title,
+          titleWidget: toolbarTitle,
+          titleAccessory: titleAccessory,
           subtitle: subtitle,
           leading: _back(context, mobile: false),
           actions: actions,
@@ -155,6 +173,7 @@ class AppPage extends StatelessWidget {
     final c = context.colors;
     final bottom = MediaQuery.paddingOf(context).bottom;
     return LargeTitleScrollView(
+      large: largeTitle,
       title: mobileTitle ?? title,
       leading: _back(context, mobile: true),
       actions: mobileActions,
@@ -186,6 +205,51 @@ class AppPage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// iOS 返回按钮：强调色箭头 + 上一级标题。
+class _BackLink extends StatelessWidget {
+  const _BackLink({required this.label});
+
+  /// 上一级标题；为空时显示「返回」。
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Pressable(
+      onTap: () => Navigator.of(context).maybePop(),
+      semanticLabel: label == null ? '返回' : '返回$label',
+      focusRadius: AppRadius.md,
+      builder: (context, st) => AnimatedOpacity(
+        duration: AppMotion.fade(pressed: st.pressed),
+        opacity: st.pressed ? 0.4 : 1,
+        child: SizedBox(
+          height: AppSizes.minTouchTarget,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(
+                AppIcons.chevronLeft,
+                size: 22,
+                color: c.link,
+                strokeWidth: 2.2,
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 88),
+                child: Text(
+                  label ?? '返回',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.type.mobileBodyLarge.copyWith(color: c.link),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

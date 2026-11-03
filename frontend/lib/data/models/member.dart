@@ -19,6 +19,7 @@ class Member {
     required this.name,
     required this.handle,
     required this.role,
+    this.color,
     this.expiresAt,
   });
 
@@ -26,6 +27,9 @@ class Member {
   final String name;
   final String handle;
   final MemberRole role;
+
+  /// 头像颜色 ARGB（API 成员字段 `color`）；为空时界面按名字取色。
+  final int? color;
 
   /// 长期有效为 null。
   final DateTime? expiresAt;

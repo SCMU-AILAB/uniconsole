@@ -22,6 +22,7 @@ class AppShell extends StatelessWidget {
     required this.onTabSelect,
     this.user,
     this.onUserSettings,
+    this.immersive = false,
   });
 
   final Widget child;
@@ -34,12 +35,19 @@ class AppShell extends StatelessWidget {
   final SidebarUser? user;
   final VoidCallback? onUserSettings;
 
+  /// 移动端全屏（横屏操控）：不显示标签栏。
+  final bool immersive;
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final size = LayoutSize.of(MediaQuery.sizeOf(context).width);
+    final size = LayoutSize.ofContext(context);
 
     final band = WindowChrome.titlebarHeight;
+
+    if (size.isMobile && immersive) {
+      return Scaffold(backgroundColor: c.videoBackground, body: child);
+    }
 
     if (size.isMobile) {
       // macOS 窗口拉窄到移动布局时，把标题栏高度当作顶部安全区，避开红黄绿按钮。

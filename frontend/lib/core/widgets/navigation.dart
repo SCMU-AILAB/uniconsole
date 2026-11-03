@@ -367,12 +367,20 @@ class AppToolbar extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.leading,
+    this.titleWidget,
+    this.titleAccessory,
     this.actions = const [],
   });
 
   final String title;
   final String? subtitle;
   final Widget? leading;
+
+  /// 自定义标题区（如操控页的设备切换按钮），替代 [title] / [subtitle]。
+  final Widget? titleWidget;
+
+  /// 紧跟标题的附件（如联调页的「4 台已同步」胶囊）。
+  final Widget? titleAccessory;
   final List<Widget> actions;
 
   @override
@@ -391,37 +399,45 @@ class AppToolbar extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, box) {
-          final heading = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (leading != null) ...[
-                leading!,
-                const SizedBox(width: AppSpacing.x3),
-              ],
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          final Widget heading = titleWidget != null
+              ? Semantics(header: true, label: title, child: titleWidget)
+              : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Semantics(
-                      header: true,
-                      child: Text(
-                        title,
-                        style: t.toolbarTitle.copyWith(color: c.label),
+                    if (leading != null) ...[
+                      leading!,
+                      const SizedBox(width: AppSpacing.x3),
+                    ],
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              title,
+                              style: t.toolbarTitle.copyWith(color: c.label),
+                            ),
+                          ),
+                          if (subtitle != null)
+                            Text(
+                              subtitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: t.caption.copyWith(
+                                color: c.secondaryLabel,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.caption.copyWith(color: c.secondaryLabel),
-                      ),
+                    if (titleAccessory != null) ...[
+                      const SizedBox(width: AppSpacing.x3),
+                      titleAccessory!,
+                    ],
                   ],
-                ),
-              ),
-            ],
-          );
+                );
           if (actions.isEmpty) {
             return Align(alignment: Alignment.centerLeft, child: heading);
           }

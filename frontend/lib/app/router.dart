@@ -3,10 +3,17 @@ import 'package:go_router/go_router.dart';
 
 import '../core/layout/app_route_page.dart';
 import '../core/widgets/widgets.dart';
+import '../core/theme/theme.dart';
 import '../features/common/placeholder_page.dart';
+import '../features/control/control_page.dart';
+import '../features/devices/device_detail_page.dart';
 import '../features/devices/devices_page.dart';
+import '../features/fleet/fleet_page.dart';
 import '../features/gallery/gallery_page.dart';
+import '../features/leases/leases_page.dart';
 import '../features/me/me_page.dart';
+import '../features/sensors/sensors_page.dart';
+import '../features/safety/safety_page.dart';
 import '../features/settings/settings_page.dart';
 import 'destinations.dart';
 import 'shell.dart';
@@ -57,6 +64,33 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
           child: ShellScaffold(location: state.uri, child: child),
         ),
         routes: [
+          // 顺序有意义：更具体的设备子路由放在 /devices 之前。
+          // 都是顶层路由：从侧边栏 go 过来是单个根页面（无返回按钮），
+          // 从设备详情 / 移动端列表 push 进来才有返回。
+          GoRoute(
+            path: '/devices/:id/control',
+            pageBuilder: (context, state) =>
+                page(state, ControlPage(deviceId: state.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/devices/:id/sensors',
+            pageBuilder: (context, state) =>
+                page(state, SensorsPage(deviceId: state.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/devices/:id',
+            pageBuilder: (context, state) {
+              final id = state.pathParameters['id']!;
+              // 移动端是设备详情页；桌面宽度下显示设备总览并选中该设备。
+              final mobile = LayoutSize.ofContext(context).isMobile;
+              return page(
+                state,
+                mobile
+                    ? DeviceDetailPage(deviceId: id)
+                    : DevicesPage(selectId: id),
+              );
+            },
+          ),
           GoRoute(
             path: Routes.devices,
             pageBuilder: (context, state) => page(
@@ -66,39 +100,17 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
                 groupId: state.uri.queryParameters['group'],
               ),
             ),
-            routes: [
-              placeholder(
-                ':id',
-                title: '设备详情',
-                icon: AppIcons.dog,
-                design: 'MobileDevice.dc.html',
-                phase: 3,
-                routes: [
-                  placeholder(
-                    'control',
-                    title: '单机操控',
-                    mobileTitle: '操控',
-                    icon: AppIcons.control,
-                    design: 'Control.dc.html · MobileControl.dc.html',
-                    phase: 3,
-                  ),
-                  placeholder(
-                    'sensors',
-                    title: '感知中心',
-                    icon: AppIcons.sensors,
-                    design: 'Sensors.dc.html',
-                    phase: 3,
-                  ),
-                ],
-              ),
-            ],
           ),
-          placeholder(
-            '/fleet/:sessionId',
-            title: '多机联调',
-            icon: AppIcons.fleet,
-            design: 'Fleet.dc.html',
-            phase: 4,
+          GoRoute(
+            path: Routes.fleetHome,
+            pageBuilder: (context, state) => page(state, const FleetPage()),
+          ),
+          GoRoute(
+            path: '/fleet/:sessionId',
+            pageBuilder: (context, state) => page(
+              state,
+              FleetPage(sessionId: state.pathParameters['sessionId']),
+            ),
           ),
           placeholder(
             '/missions',
@@ -148,20 +160,13 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
             design: 'Maintenance.dc.html',
             phase: 5,
           ),
-          placeholder(
-            '/safety',
-            title: '安全策略',
-            icon: AppIcons.safety,
-            design: 'Safety.dc.html',
-            phase: 4,
+          GoRoute(
+            path: Routes.safety,
+            pageBuilder: (context, state) => page(state, const SafetyPage()),
           ),
-          placeholder(
-            '/leases',
-            title: '控制权',
-            icon: AppIcons.lease,
-            design: 'Lease.dc.html',
-            phase: 4,
-            inspector: '租约详情',
+          GoRoute(
+            path: Routes.leases,
+            pageBuilder: (context, state) => page(state, const LeasesPage()),
           ),
           placeholder(
             '/members',

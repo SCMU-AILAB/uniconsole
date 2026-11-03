@@ -17,6 +17,8 @@ class GroupedListRow extends StatelessWidget {
     this.showChevron,
     this.selected = false,
     this.titleWeight,
+    this.titleTrailing,
+    this.detail,
   });
 
   final String title;
@@ -32,6 +34,12 @@ class GroupedListRow extends StatelessWidget {
   final bool? showChevron;
   final bool selected;
   final FontWeight? titleWeight;
+
+  /// 紧跟标题的小部件（MobileFleet 的状态文字）。
+  final Widget? titleTrailing;
+
+  /// 第三行说明（MobileFleet 的「管理 X · 使用 Y」）。
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
@@ -67,26 +75,49 @@ class GroupedListRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: (mobile ? t.mobileBody : t.body).copyWith(
-                    color:
-                        value != null &&
-                            subtitle == null &&
-                            leading == null &&
-                            !mobile
-                        ? c.secondaryLabel
-                        : c.label,
-                    fontWeight: titleWeight,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: (mobile ? t.mobileBody : t.body).copyWith(
+                          color:
+                              value != null &&
+                                  subtitle == null &&
+                                  leading == null &&
+                                  !mobile
+                              ? c.secondaryLabel
+                              : c.label,
+                          fontWeight: titleWeight,
+                        ),
+                      ),
+                    ),
+                    if (titleTrailing != null) ...[
+                      const SizedBox(width: AppSpacing.x2),
+                      titleTrailing!,
+                    ],
+                  ],
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: AppSpacing.half),
                   Text(
                     subtitle!,
-                    maxLines: 2,
+                    maxLines: detail == null ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: (mobile ? t.mobileFootnote : t.footnote).copyWith(
+                      color: c.secondaryLabel,
+                    ),
+                  ),
+                ],
+                if (detail != null) ...[
+                  const SizedBox(height: AppSpacing.half),
+                  Text(
+                    detail!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: (mobile ? t.subhead : t.caption).copyWith(
                       color: c.secondaryLabel,
                     ),
                   ),

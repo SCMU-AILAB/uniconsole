@@ -259,7 +259,7 @@ class Avatar extends StatelessWidget {
   }
 }
 
-/// 电量/进度条（5–6px 高，按阈值着色：≤20 严重、≤40 警告，其余在线）。
+/// 电量/进度条（5–6px 高；电量低于 30% 为警告色，其余为在线色，与 Main.dc.html 一致）。
 class ProgressBar extends StatelessWidget {
   const ProgressBar({
     super.key,
@@ -288,9 +288,7 @@ class ProgressBar extends StatelessWidget {
         color ??
         (!battery
             ? c.accent
-            : v <= 0.2
-            ? s.critical.dot
-            : v <= 0.4
+            : v < 0.3
             ? s.warning.dot
             : s.online.dot);
     return Semantics(

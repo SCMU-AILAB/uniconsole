@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/theme/theme.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
+import 'package:uniconsole/features/control/control_page.dart';
 import 'package:uniconsole/features/devices/devices_page.dart';
 import 'package:uniconsole/features/settings/settings_page.dart';
 import 'package:uniconsole/main.dart';
@@ -17,16 +18,12 @@ Future<ProviderContainer> pumpApp(
   tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final container = ProviderContainer();
-  addTearDown(container.dispose);
+  // 容器由 ProviderScope 持有：卸载界面即释放，mock 的定时器随之停止。
   await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: UniConsoleApp(initialLocation: location),
-    ),
+    ProviderScope(child: UniConsoleApp(initialLocation: location)),
   );
   await tester.pumpAndSettle();
-  return container;
+  return ProviderScope.containerOf(tester.element(find.byType(UniConsoleApp)));
 }
 
 /// 检查器容器（滚出视口时语义节点会被裁掉，所以按 widget 查找）。
@@ -114,13 +111,23 @@ void main() {
     );
 
     await tester.tap(find.bySemanticsLabel('单机操控'));
-    await tester.pumpAndSettle();
+    // 操控页持续推送遥测，不能 pumpAndSettle。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     // 默认打开当前用户正在使用的设备 Alpha。
-    expect(find.textContaining('id = go2-01'), findsOneWidget);
+    expect(find.byType(ControlPage), findsOneWidget);
+    expect(
+      tester.widget<ControlPage>(find.byType(ControlPage)).deviceId,
+      'go2-01',
+    );
     expect(
       tester.widget<AppSidebar>(find.byType(AppSidebar)).selectedId,
       'control',
     );
+    // 离开操控页，停止遥测订阅。
+    await tester.tap(find.bySemanticsLabel(RegExp('^设备总览')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('设备分组跳转到带筛选的设备总览', (tester) async {

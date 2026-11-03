@@ -34,6 +34,11 @@ abstract final class DemoData {
     return pts;
   }
 
+  /// 同一组点换算到机器人坐标系（米）：视图 8 m 宽，机器人在 (50%, 55%)。
+  static List<Offset> lidarMeters(int n, int seed) => [
+    for (final p in lidar(n, seed)) Offset((p.dx - 0.5) * 8, (0.55 - p.dy) * 8),
+  ];
+
   /// RL_calf 电机温度近 30 分钟（Alerts.dc.html，阈值 60 °C）。
   static final List<double> motorTemp = List.generate(60, (i) {
     final base = 44 + i * 0.25;

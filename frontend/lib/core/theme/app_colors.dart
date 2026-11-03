@@ -50,6 +50,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.mapWall,
     required this.mapRoomFill,
     required this.mapOverlay,
+    required this.mapMarker,
     required this.videoBackground,
     required this.pointCloudBackground,
     required this.hudOverlay,
@@ -124,6 +125,9 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color mapWall;
   final Color mapRoomFill;
   final Color mapOverlay;
+
+  /// 地图上普通设备标记（白色首字母在上，Fleet.dc.html #3A3A3C）。
+  final Color mapMarker;
 
   // 视频与传感器面板（§3.4，两种模式相同）
   final Color videoBackground;
@@ -210,6 +214,7 @@ class AppColors extends ThemeExtension<AppColors> {
     mapWall: Color(0xFFC7C7CC),
     mapRoomFill: Color(0xFFF2F2F7),
     mapOverlay: Color(0xF5FFFFFF),
+    mapMarker: Color(0xFF3A3A3C),
     videoBackground: Color(0xFF121214),
     pointCloudBackground: Color(0xFF0E0E10),
     hudOverlay: Color(0xB81E1E20),
@@ -268,6 +273,7 @@ class AppColors extends ThemeExtension<AppColors> {
     mapWall: Color(0xFF636366), // 推导值
     mapRoomFill: Color(0xFF2C2C2E), // 推导值
     mapOverlay: Color(0xF52C2C2E), // 推导值
+    mapMarker: Color(0xFF636366), // 推导值：深色底上仍与白字 ≥ 4.5:1
     videoBackground: Color(0xFF121214),
     pointCloudBackground: Color(0xFF0E0E10),
     hudOverlay: Color(0xB81E1E20),
@@ -340,6 +346,7 @@ class AppColors extends ThemeExtension<AppColors> {
       mapWall: mapWall,
       mapRoomFill: mapRoomFill,
       mapOverlay: mapOverlay,
+      mapMarker: mapMarker,
       videoBackground: videoBackground,
       pointCloudBackground: pointCloudBackground,
       hudOverlay: hudOverlay,
@@ -404,6 +411,7 @@ class AppColors extends ThemeExtension<AppColors> {
       mapWall: l(mapWall, other.mapWall),
       mapRoomFill: l(mapRoomFill, other.mapRoomFill),
       mapOverlay: l(mapOverlay, other.mapOverlay),
+      mapMarker: l(mapMarker, other.mapMarker),
       videoBackground: l(videoBackground, other.videoBackground),
       pointCloudBackground: l(pointCloudBackground, other.pointCloudBackground),
       hudOverlay: l(hudOverlay, other.hudOverlay),

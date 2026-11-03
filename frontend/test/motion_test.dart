@@ -20,15 +20,14 @@ Future<ProviderContainer> pumpApp(
   tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final container = ProviderContainer();
-  addTearDown(container.dispose);
-  container.read(themeModeProvider.notifier).set(ThemeMode.light);
+  // 容器由 ProviderScope 持有：卸载界面即释放，mock 的定时器随之停止。
   await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: UniConsoleApp(initialLocation: location),
-    ),
+    ProviderScope(child: UniConsoleApp(initialLocation: location)),
   );
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(UniConsoleApp)),
+  );
+  container.read(themeModeProvider.notifier).set(ThemeMode.light);
   await tester.pumpAndSettle();
   return container;
 }
@@ -158,7 +157,8 @@ void main() {
     testWidgets('根页面与外壳没有转场遮罩：背景保持 token 原色（${platform.name}）', (tester) async {
       debugDefaultTargetPlatformOverride = platform;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      await pumpApp(tester);
+      // 设置页内容少，底部是纯背景。
+      await pumpApp(tester, location: Routes.settings);
       final layer = tester.binding.renderViews.first.debugLayer! as OffsetLayer;
       final img = (await tester.runAsync(
         () => layer.toImage(const Rect.fromLTWH(0, 0, 1440, 900)),

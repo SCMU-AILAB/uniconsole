@@ -5,9 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'app/destinations.dart';
 import 'app/router.dart';
 import 'core/dev/debug_screenshot.dart';
+import 'core/platform/orientation.dart';
 import 'core/theme/theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  AppOrientation.portrait();
   final container = ProviderContainer();
   switch (debugThemeOverride) {
     case 'light':

@@ -8,6 +8,7 @@ abstract final class Routes {
   static String device(String id) => '/devices/$id';
   static String control(String deviceId) => '/devices/$deviceId/control';
   static String sensors(String deviceId) => '/devices/$deviceId/sensors';
+  static const fleetHome = '/fleet';
   static String fleet(String sessionId) => '/fleet/$sessionId';
   static const missions = '/missions';
   static const alerts = '/alerts';

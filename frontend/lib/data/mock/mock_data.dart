@@ -1,3 +1,5 @@
+import 'dart:ui' show Offset, Rect;
+
 import '../models/models.dart';
 
 /// 示例数据，取自 design/*.dc.html 的 renderVals()。
@@ -11,13 +13,21 @@ abstract final class MockData {
       name: 'Kanade',
       handle: '@kanade',
       role: MemberRole.admin,
+      color: 0xFF5856D6,
     ),
-    Member(id: 'linyue', name: '林悦', handle: '@linyue', role: MemberRole.owner),
+    Member(
+      id: 'linyue',
+      name: '林悦',
+      handle: '@linyue',
+      role: MemberRole.owner,
+      color: 0xFFFF2D55,
+    ),
     Member(
       id: 'zhouming',
       name: '周明',
       handle: '@zhouming',
       role: MemberRole.user,
+      color: 0xFF248A3D,
     ),
   ];
 
@@ -230,17 +240,110 @@ abstract final class MockData {
     ),
   ];
 
-  // Fleet.dc.html：联调会话 #12
-  static const sessions = [
+  // Fleet.dc.html：联调会话 #12（周明发起，已运行 18 分钟）。
+  // 参与设备与 Lease.dc.html 一致：Echo、Foxtrot 由会话持有；Alpha 仍在 Kanade 的单机操控中，
+  // Bravo 空闲，二者可在页面上勾选加入。
+  static final sessions = [
     FleetSession(
       id: 's12',
-      name: '联调会话 #12',
-      deviceIds: ['g1-01', 'go2-04'],
-      leaderId: 'g1-01',
+      number: 12,
+      title: '展厅迎宾',
+      presetId: 'p-welcome',
+      initiatorId: 'zhouming',
+      startedAt: DateTime(2026, 11, 2, 14, 14),
+      deviceIds: const ['g1-01', 'go2-04'],
       formation: Formation.v,
-      spacing: 1.5,
+      spacing: 1.2,
     ),
   ];
+
+  // Fleet.dc.html 侧边栏「联调预设」
+  static const presets = [
+    FleetPreset(
+      id: 'p-welcome',
+      name: '展厅迎宾',
+      deviceIds: ['g1-01', 'go2-04', 'go2-01', 'go2-02'],
+    ),
+    FleetPreset(
+      id: 'p-warehouse',
+      name: '仓库协同巡检',
+      deviceIds: ['go2-01', 'go2-03', 'b2-01'],
+      formation: Formation.column,
+      spacing: 2,
+    ),
+    FleetPreset(
+      id: 'p-dance',
+      name: '编队舞蹈 v2',
+      deviceIds: ['g1-01', 'go2-01', 'go2-02', 'go2-04', 'go2-05'],
+      formation: Formation.grid,
+      spacing: 1,
+    ),
+  ];
+
+  // Safety.dc.html Z[]：展厅 1F + B 区，按 20 m × 12 m 换算面积。
+  static const siteMap = SiteMap(
+    id: 'showroom-1f',
+    name: '展厅 1F + B 区',
+    widthMeters: 20,
+    heightMeters: 12,
+    devicePositions: {
+      'g1-01': Offset(48, 50),
+      'go2-04': Offset(54, 62),
+      'go2-01': Offset(30, 54),
+      'go2-02': Offset(22, 30),
+      'go2-03': Offset(78, 74),
+    },
+  );
+
+  static const zones = [
+    Zone(
+      id: 'z1',
+      mapId: 'showroom-1f',
+      name: '展品区',
+      type: ZoneType.ban,
+      rect: Rect.fromLTWH(62, 14, 26, 30),
+      rule: '禁止进入',
+      scope: '全部设备',
+      schedule: '始终',
+      action: '在边界外 0.5 m 停止并告警',
+    ),
+    Zone(
+      id: 'z2',
+      mapId: 'showroom-1f',
+      name: '接待台人流区',
+      type: ZoneType.slow,
+      rect: Rect.fromLTWH(12, 16, 30, 28),
+      rule: '限速 0.5 m/s',
+      scope: '全部设备',
+      schedule: '每天 09:00–18:00',
+      action: '自动降速，禁止奔跑和跳跃步态',
+    ),
+    Zone(
+      id: 'z3',
+      mapId: 'showroom-1f',
+      name: '台阶边缘',
+      type: ZoneType.ban,
+      rect: Rect.fromLTWH(40, 72, 22, 12),
+      rule: '禁止进入',
+      scope: 'Go2 系列',
+      schedule: '始终',
+      action: '停止并原地站立',
+    ),
+    Zone(
+      id: 'z4',
+      mapId: 'showroom-1f',
+      name: '维修间',
+      type: ZoneType.whitelist,
+      rect: Rect.fromLTWH(70, 58, 18, 26),
+      rule: '仅白名单设备',
+      scope: 'Charlie、Golf',
+      schedule: '始终',
+      action: '非白名单设备拒绝路径规划',
+    ),
+  ];
+
+  /// Safety.dc.html：「上次急停演练 10 月 28 日」。
+  static final lastDrillAt = DateTime(2026, 10, 28, 10);
 
   // Lease.dc.html D[]（Alpha 有 1 个待处理申请）
   static final leases = [
@@ -249,9 +352,11 @@ abstract final class MockData {
       holderKind: LeaseHolderKind.user,
       holderId: 'kanade',
       source: '单机操控',
+      acquiredAt: DateTime(2026, 11, 2, 13, 51),
       expiresAt: DateTime(2026, 11, 2, 14, 36, 18),
       queue: [
         LeaseRequest(
+          id: 'r1',
           userId: 'linyue',
           reason: '调试新步态参数，需要在 B 区走廊测试',
           expectedDuration: const Duration(minutes: 20),
@@ -264,6 +369,7 @@ abstract final class MockData {
       holderKind: LeaseHolderKind.user,
       holderId: 'zhouming',
       source: '单机操控',
+      acquiredAt: DateTime(2026, 11, 2, 12, 30),
       expiresAt: DateTime(2026, 11, 2, 14, 34, 51),
     ),
     const Lease(

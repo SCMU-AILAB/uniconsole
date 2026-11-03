@@ -61,6 +61,7 @@ class TimelineTrack extends StatelessWidget {
     this.labelWidth = 64,
     this.trackHeight = 16,
     this.positionLabel,
+    this.labelStyle,
   });
 
   final List<TimelineTrackData> tracks;
@@ -80,6 +81,9 @@ class TimelineTrack extends StatelessWidget {
   /// 播放头位置的读屏文字，如「00:12:41」。
   final String? positionLabel;
 
+  /// 轨道名样式，默认 11.5 次要文字（联调时间轴用 12 中粗主文字）。
+  final TextStyle? labelStyle;
+
   static const double _gap = 8;
 
   static bool _isBlock(TimelineTrackData tr) =>
@@ -98,7 +102,7 @@ class TimelineTrack extends StatelessWidget {
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: t.footnote.copyWith(color: c.secondaryLabel),
+        style: labelStyle ?? t.footnote.copyWith(color: c.secondaryLabel),
       ),
     );
 

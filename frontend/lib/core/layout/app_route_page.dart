@@ -45,7 +45,7 @@ class _AppPageRoute<T> extends PageRoute<T>
   @override
   Widget buildContent(BuildContext context) {
     final c = context.colors;
-    final mobile = LayoutSize.of(MediaQuery.sizeOf(context).width).isMobile;
+    final mobile = LayoutSize.ofContext(context).isMobile;
     return ColoredBox(
       color: mobile ? c.mobileBackground : c.windowBackground,
       child: _page.child,

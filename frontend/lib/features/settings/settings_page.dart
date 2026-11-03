@@ -16,7 +16,7 @@ class SettingsPage extends ConsumerWidget {
     final t = context.type;
     final mode = ref.watch(themeModeProvider);
     final accent = ref.watch(accentProvider);
-    final mobile = LayoutSize.of(MediaQuery.sizeOf(context).width).isMobile;
+    final mobile = LayoutSize.ofContext(context).isMobile;
 
     final appearance = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -7,6 +7,7 @@ import '../core/layout/app_shell.dart';
 import '../core/theme/theme.dart';
 import '../core/widgets/widgets.dart';
 import '../data/providers.dart';
+import '../features/fleet/fleet_widgets.dart';
 import 'destinations.dart';
 
 /// 「单机操控」「感知中心」默认打开的设备：当前用户正在使用的第一台，否则第一台。
@@ -32,7 +33,7 @@ String? locationFor(String id, WidgetRef ref) {
     'devices' => Routes.devices,
     'control' => device == null ? Routes.devices : Routes.control(device),
     'sensors' => device == null ? Routes.devices : Routes.sensors(device),
-    'fleet' => session == null ? Routes.devices : Routes.fleet(session),
+    'fleet' => session == null ? Routes.fleetHome : Routes.fleet(session),
     'missions' => Routes.missions,
     'alerts' => Routes.alerts,
     'replay' => Routes.recordings,
@@ -59,13 +60,23 @@ class ShellScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(fleetSummaryProvider);
     final groups = ref.watch(deviceGroupsProvider).value ?? const [];
+    final presets = ref.watch(fleetPresetsProvider).value ?? const [];
+    final onFleet = sidebarIdFor(location) == 'fleet';
     final me = ref.watch(currentUserProvider).value;
     final status = context.status;
 
     void go(String id) {
+      if (id.startsWith('preset:')) {
+        startFleetPreset(context, ref, id.substring(7));
+        return;
+      }
       final loc = locationFor(id, ref);
       if (loc != null) context.go(loc);
     }
+
+    // ⌘⇧E 全局急停（Settings.dc.html 快捷键）：只触发，解除需要到安全策略页确认。
+    void globalEstop() =>
+        ref.read(safetyRepositoryProvider).setGlobalEstop(active: true);
 
     int? positive(int n) => n > 0 ? n : null;
 
@@ -85,7 +96,19 @@ class ShellScaffold extends ConsumerWidget {
       SidebarSection(title: '工作台', items: [for (final e in workbench) item(e)]),
       SidebarSection(title: '运维', items: [for (final e in operations) item(e)]),
       SidebarSection(title: '管理', items: [for (final e in management) item(e)]),
-      if (groups.isNotEmpty)
+      // 第四组随页面变化：联调页显示「联调预设」（Fleet.dc.html），其余显示设备分组。
+      if (onFleet && presets.isNotEmpty)
+        SidebarSection(
+          title: '联调预设',
+          items: [
+            for (final p in presets)
+              SidebarItem(
+                id: 'preset:${p.id}',
+                label: '${p.name} · ${p.deviceIds.length} 台',
+              ),
+          ],
+        )
+      else if (groups.isNotEmpty)
         SidebarSection(
           title: '设备分组',
           items: [
@@ -128,6 +151,13 @@ class ShellScaffold extends ConsumerWidget {
             go('agent'),
         const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
             go('settings'),
+        const SingleActivator(LogicalKeyboardKey.keyE, meta: true, shift: true):
+            globalEstop,
+        const SingleActivator(
+          LogicalKeyboardKey.keyE,
+          control: true,
+          shift: true,
+        ): globalEstop,
       },
       child: Focus(
         autofocus: true,
@@ -146,6 +176,7 @@ class ShellScaffold extends ConsumerWidget {
                   color: context.colors.avatarPalette.first,
                 ),
           onUserSettings: () => go('settings'),
+          immersive: tabIdFor(location) == 'control',
           child: child,
         ),
       ),

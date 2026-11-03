@@ -68,6 +68,7 @@ class _GalleryPageState extends State<GalleryPage> {
             const CardsSection(),
             const ListsSection(),
             FeedbackSection(estop: _estop),
+            const DialogsSection(),
             const TableSection(),
             const ChartsSection(),
             const TimelineSection(),

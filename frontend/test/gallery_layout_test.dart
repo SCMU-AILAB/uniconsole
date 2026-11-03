@@ -14,16 +14,14 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
 
-        final container = ProviderContainer();
-        addTearDown(container.dispose);
-        container.read(themeModeProvider.notifier).set(mode);
-
         await tester.pumpWidget(
-          UncontrolledProviderScope(
-            container: container,
-            child: const UniConsoleApp(initialLocation: Routes.gallery),
+          const ProviderScope(
+            child: UniConsoleApp(initialLocation: Routes.gallery),
           ),
         );
+        ProviderScope.containerOf(
+          tester.element(find.byType(UniConsoleApp)),
+        ).read(themeModeProvider.notifier).set(mode);
         await tester.pumpAndSettle();
 
         // 逐屏滚到底，让所有区块都完成布局。主内容区是最大的那个纵向滚动视图。

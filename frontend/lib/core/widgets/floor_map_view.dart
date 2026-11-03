@@ -50,6 +50,15 @@ class MapRoute {
   final Color? color;
 }
 
+/// 地图上的文字标注（「接待台」「入口」）。
+class MapLabel {
+  const MapLabel(this.position, this.text, {this.color});
+
+  final Offset position;
+  final String text;
+  final Color? color;
+}
+
 class MapWaypoint {
   const MapWaypoint(this.index, this.position, {this.name});
 
@@ -82,6 +91,9 @@ class FloorMapView extends StatelessWidget {
     this.selectedWaypoint,
     this.onWaypointTap,
     this.overlays = const [],
+    this.labels = const [],
+    this.layer,
+    this.zoom = 1,
     this.footer,
     this.gridSize = 26,
     this.semanticLabel = '平面地图',
@@ -99,8 +111,16 @@ class FloorMapView extends StatelessWidget {
   final int? selectedWaypoint;
   final ValueChanged<int>? onWaypointTap;
 
-  /// 浮在地图上的工具栏、图例等（自行 Positioned）。
+  /// 浮在地图上的工具栏、图例等（自行 Positioned），不随 [zoom] 缩放。
   final List<Widget> overlays;
+  final List<MapLabel> labels;
+
+  /// 地图坐标系内的自定义图层（设备标记、可拖动的围栏），随 [zoom] 缩放。
+  /// 参数为地图的像素尺寸，坐标按百分比换算。
+  final Widget Function(BuildContext context, Size size)? layer;
+
+  /// 缩放倍数，以地图中心为原点（放大 / 缩小按钮）。
+  final double zoom;
 
   /// 左下角说明文字。
   final String? footer;
@@ -138,7 +158,7 @@ class FloorMapView extends StatelessWidget {
               ZoneKind.whitelist => s.action.fg,
             };
 
-            return Stack(
+            final map = Stack(
               clipBehavior: Clip.none,
               children: [
                 Positioned.fill(
@@ -300,6 +320,31 @@ class FloorMapView extends StatelessWidget {
                       ),
                     ),
                   ),
+                for (final l in labels)
+                  Positioned(
+                    left: px(l.position).dx,
+                    top: px(l.position).dy,
+                    child: Text(
+                      l.text,
+                      style: t.caption.copyWith(
+                        color: l.color ?? c.secondaryLabel,
+                      ),
+                    ),
+                  ),
+                if (layer != null)
+                  Positioned.fill(child: layer!(context, Size(w, h))),
+              ],
+            );
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedScale(
+                    scale: zoom,
+                    duration: AppMotion.move(context, AppMotion.smooth),
+                    curve: AppMotion.smooth,
+                    child: map,
+                  ),
+                ),
                 if (footer != null)
                   Positioned(
                     left: AppSpacing.x4,

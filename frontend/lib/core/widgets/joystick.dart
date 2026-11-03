@@ -23,6 +23,7 @@ class Joystick extends StatefulWidget {
     this.size = 132,
     this.caption,
     this.value,
+    this.overlay = false,
   });
 
   final String semanticLabel;
@@ -36,6 +37,9 @@ class Joystick extends StatefulWidget {
   /// 外部驱动的位置（键盘/手柄输入时显示）；拖动时以手势为准。
   final Offset? value;
 
+  /// 叠在视频上的半透明样式（MobileControl.dc.html）：白色 12% 底、90% 圆钮、无方向提示。
+  final bool overlay;
+
   @override
   State<Joystick> createState() => _JoystickState();
 }
@@ -43,7 +47,7 @@ class Joystick extends StatefulWidget {
 class _JoystickState extends State<Joystick> {
   Offset? _drag;
 
-  double get _knob => widget.size * 50 / 132;
+  double get _knob => widget.size * (widget.overlay ? 56 / 136 : 50 / 132);
   double get _travel => (widget.size - _knob) / 2 - 4;
 
   void _update(Offset local) {
@@ -91,13 +95,21 @@ class _JoystickState extends State<Joystick> {
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
-            color: c.fillSecondary,
+            color: widget.overlay
+                ? c.hudText.withValues(alpha: 0.12)
+                : c.fillSecondary,
             shape: BoxShape.circle,
-            border: Border.all(color: c.separator),
+            border: Border.all(
+              color: widget.overlay
+                  ? c.hudText.withValues(alpha: 0.25)
+                  : c.separator,
+            ),
           ),
           child: Stack(
             children: [
-              if (widget.axis == JoystickAxis.both) ...[
+              if (widget.overlay)
+                const SizedBox.shrink()
+              else if (widget.axis == JoystickAxis.both) ...[
                 arrow('▲', Alignment.topCenter),
                 arrow('▼', Alignment.bottomCenter),
                 arrow('◀', Alignment.centerLeft),
@@ -118,8 +130,10 @@ class _JoystickState extends State<Joystick> {
                   width: _knob,
                   height: _knob,
                   decoration: BoxDecoration(
-                    color: c.isDark
-                        ? c.decorativeGrayLight.withValues(alpha: 1)
+                    color: widget.overlay
+                        ? c.hudText.withValues(alpha: 0.9)
+                        : c.isDark
+                        ? c.decorativeGrayLight
                         : c.surface,
                     shape: BoxShape.circle,
                     boxShadow: [

@@ -18,7 +18,7 @@ UNICONSOLE_WINDOW_SIZE="$size" UNICONSOLE_SCREENSHOT="$(basename "$out")" \
 UNICONSOLE_SCREENSHOT_SCROLL="$scroll" UNICONSOLE_THEME="$theme" UNICONSOLE_ROUTE="$route" \
   "$app" >"$log" 2>&1 &
 pid=$!
-trap 'kill $pid 2>/dev/null || true; rm -f "$log"' EXIT
+trap 'kill $pid 2>/dev/null || true; wait $pid 2>/dev/null || true; rm -f "$log"' EXIT
 
 for _ in $(seq 1 60); do
   grep -q "UNICONSOLE_SCREENSHOT saved" "$log" && break

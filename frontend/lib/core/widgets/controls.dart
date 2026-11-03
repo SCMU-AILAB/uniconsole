@@ -247,6 +247,110 @@ class SearchField extends StatelessWidget {
   }
 }
 
+/// 文本输入框（描边 1px、圆角 8）。[minLines] > 1 时为多行（附言、原因）。
+/// 获得焦点时描边变为强调色并带 3pt 外圈（macOS 焦点环）。
+class AppTextField extends StatefulWidget {
+  const AppTextField({
+    super.key,
+    required this.hint,
+    this.controller,
+    this.onChanged,
+    this.onSubmitted,
+    this.minLines = 1,
+    this.maxLines,
+    this.autofocus = false,
+    this.semanticLabel,
+    this.mobile = false,
+  });
+
+  final String hint;
+  final TextEditingController? controller;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final int minLines;
+  final int? maxLines;
+  final bool autofocus;
+  final String? semanticLabel;
+
+  /// 移动端字号 16（避免 iOS 聚焦时自动放大）。
+  final bool mobile;
+
+  @override
+  State<AppTextField> createState() => _AppTextFieldState();
+}
+
+class _AppTextFieldState extends State<AppTextField> {
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final style =
+        (widget.mobile
+                ? context.type.mobileBody.copyWith(fontSize: 16)
+                : context.type.body.copyWith(fontSize: 12.5))
+            .copyWith(color: c.label);
+    final focused = _focus.hasFocus;
+    final multiline = widget.minLines > 1;
+    return AnimatedContainer(
+      duration: AppMotion.highlight,
+      curve: AppMotion.highlightCurve,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x3,
+        vertical: AppSpacing.x2,
+      ),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: focused ? c.accent : c.controlBorder),
+        boxShadow: [
+          BoxShadow(
+            color: focused ? c.accentRing : c.accentRing.withValues(alpha: 0),
+            spreadRadius: 3,
+          ),
+        ],
+      ),
+      child: Semantics(
+        label: widget.semanticLabel ?? widget.hint,
+        textField: true,
+        child: Material(
+          type: MaterialType.transparency,
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _focus,
+            autofocus: widget.autofocus,
+            onChanged: widget.onChanged,
+            onSubmitted: widget.onSubmitted,
+            minLines: widget.minLines,
+            maxLines: multiline ? (widget.maxLines ?? widget.minLines + 4) : 1,
+            keyboardType: multiline ? TextInputType.multiline : null,
+            textInputAction: multiline ? null : TextInputAction.done,
+            style: style,
+            cursorColor: c.accent,
+            cursorHeight: style.fontSize! + 2,
+            decoration: InputDecoration.collapsed(
+              hintText: widget.hint,
+              hintStyle: style.copyWith(color: c.secondaryLabel),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// iOS 风格开关：38×22 轨道、18 圆钮。
 class AppSwitch extends StatelessWidget {
   const AppSwitch({

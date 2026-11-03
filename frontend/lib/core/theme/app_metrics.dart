@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+
 /// 尺寸、圆角、间距、断点（HANDOFF.md §3.6 / §11）。
 abstract final class AppRadius {
   /// 小按钮、分段控件选中块
@@ -78,6 +81,18 @@ enum LayoutSize {
 
   /// ≥ 1280：侧边栏 + 内容 + 右栏
   wide;
+
+  /// 按当前窗口判断。手机（iOS / Android）按短边判断，横屏时仍是移动布局；
+  /// 桌面窗口按宽度判断。
+  static LayoutSize ofContext(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final phone =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.android);
+    if (phone && size.shortestSide < 600) return compact;
+    return of(size.width);
+  }
 
   static LayoutSize of(double width) {
     if (width >= 1280) return wide;

@@ -1582,6 +1582,61 @@ class FeedbackSection extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------- 输入框与提示框
+
+class DialogsSection extends StatelessWidget {
+  const DialogsSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GallerySection(
+      title: '输入框与提示框',
+      description: 'AppTextField：聚焦时强调色描边 + 外圈；多行用于附言。提示框从 104% 缩小淡入，Esc 关闭、回车确认；危险操作用红色按钮，必填原因为空时不能确认。',
+      child: ResponsiveGrid(
+        minItemWidth: 300,
+        maxColumns: 2,
+        children: [
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTextField(hint: '预设名称'),
+              SizedBox(height: AppSpacing.x2),
+              AppTextField(hint: '附言（可选）', minLines: 2),
+            ],
+          ),
+          Wrap(
+            spacing: AppSpacing.x2,
+            runSpacing: AppSpacing.x2,
+            children: [
+              SecondaryButton(
+                label: '确认框',
+                onPressed: () => confirmAction(
+                  context,
+                  title: '结束联调会话 #12？',
+                  message: '2 台设备会停止当前动作，并释放会话持有的控制权。',
+                  confirmLabel: '结束会话',
+                  destructive: true,
+                ),
+              ),
+              SecondaryButton(
+                label: '输入框',
+                onPressed: () => promptText(
+                  context,
+                  title: '强制收回 Charlie 的控制权？',
+                  message: '会立即停止设备、通知周明，并写入审计日志。',
+                  hint: '原因（必填）',
+                  confirmLabel: '强制收回',
+                  destructive: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------- 数据表
 
 class TableSection extends StatefulWidget {
@@ -2040,7 +2095,7 @@ class _ControlSectionState extends State<ControlSection> {
   String _cam = 'front';
   Offset _move = Offset.zero;
   Offset _turn = Offset.zero;
-  static final _miniPts = DemoData.lidar(140, 11);
+  static final _miniPts = DemoData.lidarMeters(140, 11);
 
   static const _cams = [
     ('front', '前置 RGB'),
@@ -2175,7 +2230,7 @@ class _ControlSectionState extends State<ControlSection> {
 class PointCloudSection extends StatelessWidget {
   const PointCloudSection({super.key});
 
-  static final _pts = DemoData.lidar(900, 7);
+  static final _pts = DemoData.lidarMeters(900, 7);
 
   @override
   Widget build(BuildContext context) {
@@ -2190,10 +2245,12 @@ class PointCloudSection extends StatelessWidget {
             aspectRatio: 16 / 7,
             child: PointCloudView(
               points: _pts,
-              robot: const Offset(0.62, 0.4),
-              showRings: true,
+              rangeMeters: 2.4,
+              rings: const [1, 2, 4],
+              showHeading: true,
               label: 'LiDAR · 俯视 · 10 Hz',
               pointSize: 2.2,
+              robotSize: 14,
             ),
           ),
           const SizedBox(height: AppSpacing.x2),
@@ -2202,8 +2259,8 @@ class PointCloudSection extends StatelessWidget {
             children: [
               for (final (label, color) in [
                 ('近 < 1 m', c.cloudNear),
-                ('中 1–3 m', c.cloudMid),
-                ('远 > 3 m', c.cloudFar),
+                ('中 1–2 m', c.cloudMid),
+                ('远 > 2 m', c.cloudFar),
               ])
                 Row(
                   mainAxisSize: MainAxisSize.min,

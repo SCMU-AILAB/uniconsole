@@ -17,9 +17,13 @@ class LargeTitleScrollView extends StatelessWidget {
     this.actions = const [],
     this.leading,
     this.controller,
+    this.large = true,
   });
 
   final String title;
+
+  /// false 时为二级页面的内联标题（17pt 居中，不显示大标题）。
+  final bool large;
   final List<Widget> slivers;
 
   /// 标题栏右侧（圆形图标按钮等）。
@@ -39,6 +43,7 @@ class LargeTitleScrollView extends StatelessWidget {
           pinned: true,
           delegate: _LargeTitleHeader(
             title: title,
+            large: large,
             topPadding: top,
             actions: actions,
             leading: leading,
@@ -60,6 +65,7 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
     required this.leading,
     required this.colors,
     required this.type,
+    required this.large,
   });
 
   final String title;
@@ -68,12 +74,15 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
   final Widget? leading;
   final AppColors colors;
   final AppTypography type;
+  final bool large;
 
   /// 标题栏（收起后）高度。
   static const double barHeight = 52;
 
   /// 大标题区高度。
-  static const double largeHeight = 50;
+  static const double _largeHeight = 50;
+
+  double get largeHeight => large ? _largeHeight : 0;
 
   @override
   double get minExtent => topPadding + barHeight;
@@ -88,11 +97,14 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     final c = colors;
-    final t = (shrinkOffset / largeHeight).clamp(0.0, 1.0);
+    final t = large ? (shrinkOffset / largeHeight).clamp(0.0, 1.0) : 1.0;
     final collapsed = t >= 1;
     // 内容滚到标题栏下面时才出现背景（iOS 的 scrollEdgeAppearance）。
     final showBar =
-        collapsed && (overlapsContent || shrinkOffset > largeHeight);
+        collapsed &&
+        (overlapsContent ||
+            shrinkOffset > largeHeight ||
+            (!large && shrinkOffset > 0));
 
     // 标题按整屏居中，两侧各留 88pt 给返回按钮和操作按钮。
     final bar = SizedBox(
@@ -195,6 +207,7 @@ class _LargeTitleHeader extends SliverPersistentHeaderDelegate {
       old.topPadding != topPadding ||
       old.actions != actions ||
       old.leading != leading ||
+      old.large != large ||
       old.colors != colors ||
       old.type != type;
 }
