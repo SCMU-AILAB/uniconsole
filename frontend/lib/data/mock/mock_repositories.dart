@@ -4,15 +4,23 @@ import 'dart:ui' show Offset;
 
 import '../models/models.dart';
 import '../repositories/repositories.dart';
+import 'mock_alerts.dart';
 import 'mock_data.dart';
 import 'mock_fleet.dart';
 import 'mock_leases.dart';
+import 'mock_maintenance.dart';
+import 'mock_missions.dart';
+import 'mock_recordings.dart';
 import 'mock_safety.dart';
 import 'mock_seed.dart';
 import 'mock_store.dart';
 
+export 'mock_alerts.dart';
 export 'mock_fleet.dart';
 export 'mock_leases.dart';
+export 'mock_maintenance.dart';
+export 'mock_missions.dart';
+export 'mock_recordings.dart';
 export 'mock_safety.dart';
 
 /// 所有 mock 仓库的集合，彼此之间共享状态（控制指令 → 模拟机器人 → 遥测、事件；
@@ -24,6 +32,9 @@ class MockWorld {
     fleet = MockRobotFleet(world: this);
     sessions = MockFleetRepository(world: this);
     safety = MockSafetyRepository(world: this);
+    alerts = MockAlertRepository(world: this);
+    missions = MockMissionRepository(world: this);
+    maintenance = MockMaintenanceRepository(world: this);
   }
 
   final int telemetryHz;
@@ -33,7 +44,10 @@ class MockWorld {
   late final MockRobotFleet fleet;
   late final MockFleetRepository sessions;
   late final MockSafetyRepository safety;
-  final alerts = MockAlertRepository();
+  late final MockAlertRepository alerts;
+  late final MockMissionRepository missions;
+  late final MockMaintenanceRepository maintenance;
+  final recordings = MockRecordingRepository();
   final members = MockMemberRepository();
 
   Member get me => MockData.members.firstWhere((m) => m.id == currentUserId);
@@ -41,8 +55,12 @@ class MockWorld {
   String nameOf(String userId) =>
       MockData.members.where((m) => m.id == userId).firstOrNull?.name ?? userId;
 
-  /// 停止 mock 内部的定时器（租约到期检查）。
-  void dispose() => leases.dispose();
+  /// 停止 mock 内部的定时器（租约到期检查、固件升级进度、建图）。
+  void dispose() {
+    leases.dispose();
+    missions.dispose();
+    maintenance.dispose();
+  }
 }
 
 class MockDeviceRepository implements DeviceRepository {
@@ -64,6 +82,10 @@ class MockDeviceRepository implements DeviceRepository {
 
   Device? device(String id) =>
       _devices.value.where((d) => d.id == id).firstOrNull;
+
+  void update(String id, Device Function(Device) f) {
+    _devices.value = [for (final d in _devices.value) d.id == id ? f(d) : d];
+  }
 
   void addEvent(String deviceId, String text, EventTone tone) {
     final store = _events[deviceId];
@@ -88,25 +110,6 @@ class MockDeviceRepository implements DeviceRepository {
   @override
   Stream<List<DeviceEvent>> watchEvents(String deviceId) =>
       _events[deviceId]?.watch() ?? Stream.value(const []);
-}
-
-class MockAlertRepository implements AlertRepository {
-  final _alerts = MockStore<List<Alert>>([
-    for (final a in MockData.alerts)
-      Alert(
-        id: a.id,
-        severity: a.severity,
-        state: a.state,
-        title: a.title,
-        deviceId: a.deviceId,
-        metric: a.metric,
-        createdAt: MockSeed.rebase(a.createdAt),
-        events: a.events,
-      ),
-  ]);
-
-  @override
-  Stream<List<Alert>> watchAlerts() => _alerts.watch();
 }
 
 class MockMemberRepository implements MemberRepository {

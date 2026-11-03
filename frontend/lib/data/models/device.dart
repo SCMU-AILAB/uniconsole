@@ -76,4 +76,25 @@ class Device {
   /// °C；离线时为 null。
   final int? maxMotorTemp;
   final Duration? uptime;
+
+  Device copyWith({String? firmware, Duration? uptime}) => Device(
+    id: id,
+    name: name,
+    code: code,
+    model: model,
+    kind: kind,
+    status: status,
+    battery: battery,
+    latencyMs: latencyMs,
+    location: location,
+    currentTask: currentTask,
+    groupId: groupId,
+    ownerId: ownerId,
+    userId: userId,
+    sn: sn,
+    firmware: firmware ?? this.firmware,
+    ip: ip,
+    maxMotorTemp: maxMotorTemp,
+    uptime: uptime ?? this.uptime,
+  );
 }

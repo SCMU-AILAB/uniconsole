@@ -33,7 +33,11 @@ abstract final class MockSeed {
     'go2-04': [(const Duration(minutes: 22), '设备上线', EventTone.success)],
     'h1-01': [(const Duration(hours: 2), '连接断开（心跳超时）', EventTone.neutral)],
     'go2-05': [
-      (const Duration(hours: 20, minutes: 12), '手动关机', EventTone.neutral),
+      (
+        const Duration(days: 1, hours: 20, minutes: 12),
+        '手动关机',
+        EventTone.neutral,
+      ),
     ],
   };
 

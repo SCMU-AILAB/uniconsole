@@ -22,7 +22,7 @@ class MockSafetyRepository implements SafetyRepository {
   );
   final _map = MockStore(MockData.siteMap);
   final _zones = MockStore<List<Zone>>(MockData.zones);
-  var _zoneSeq = 5;
+  var _zoneSeq = 6;
   final _rnd = math.Random(7);
 
   SafetyState get state => _state.value;
@@ -85,22 +85,37 @@ class MockSafetyRepository implements SafetyRepository {
   @override
   Stream<SiteMap> watchMap() => _map.watch();
 
-  @override
-  Stream<List<Zone>> watchZones() => _zones.watch();
+  /// 所有地图上的围栏（地图与任务页按地图过滤）。
+  List<Zone> get zones => _zones.value;
 
   @override
-  Future<String> addZone(ZoneType type) async {
-    final n = _zones.value.where((z) => z.type == type).length + 1;
+  Stream<List<Zone>> watchZones({String? mapId}) {
+    final id = mapId ?? _map.value.id;
+    return _zones.watch().map(
+      (all) => [
+        for (final z in all)
+          if (z.mapId == id) z,
+      ],
+    );
+  }
+
+  @override
+  Future<String> addZone(ZoneType type, {String? mapId, Rect? rect}) async {
+    final map = mapId ?? _map.value.id;
+    final n =
+        _zones.value.where((z) => z.type == type && z.mapId == map).length + 1;
     final id = 'z${_zoneSeq++}';
     final zone = Zone(
       id: id,
-      mapId: _map.value.id,
+      mapId: map,
       name: '${type.label} $n',
       type: type,
-      // 新围栏放在地图中央，用户再拖动角点调整。
-      rect: type == ZoneType.wall
-          ? const Rect.fromLTWH(30, 50, 24, 2)
-          : const Rect.fromLTWH(38, 40, 18, 18),
+      // 未指定位置时放在地图中央，用户再拖动角点调整。
+      rect:
+          rect ??
+          (type == ZoneType.wall
+              ? const Rect.fromLTWH(30, 50, 24, 2)
+              : const Rect.fromLTWH(38, 40, 18, 18)),
       rule: switch (type) {
         ZoneType.ban => '禁止进入',
         ZoneType.slow => '限速 0.5 m/s',

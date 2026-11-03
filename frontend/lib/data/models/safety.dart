@@ -215,18 +215,61 @@ class SiteMap {
   const SiteMap({
     required this.id,
     required this.name,
+    String? shortName,
     required this.widthMeters,
     required this.heightMeters,
     this.devicePositions = const {},
-  });
+    this.deviceHeadings = const {},
+    this.areas = const [],
+    this.chargers = const [],
+    this.resolutionCm = 5,
+    this.updatedAt,
+  }) : shortName = shortName ?? name;
 
   final String id;
   final String name;
+
+  /// 地图切换器上的短名（Missions.dc.html「B 区巡检层」）。
+  final String shortName;
   final double widthMeters;
   final double heightMeters;
 
   /// 设备在该地图上的最新位置（百分比坐标，来自定位）。
   final Map<String, Offset> devicePositions;
+
+  /// 设备朝向（弧度，0 = 朝上，π/2 = 朝右）。
+  final Map<String, double> deviceHeadings;
+
+  /// 外墙与房间（建图结果）。
+  final List<MapArea> areas;
+
+  /// 充电桩位置（百分比坐标）。
+  final List<Offset> chargers;
+  final int resolutionCm;
+
+  /// 最近一次建图时间。
+  final DateTime? updatedAt;
+
+  /// 百分比坐标换算成米。
+  Offset toMeters(Offset percent) =>
+      Offset(percent.dx / 100 * widthMeters, percent.dy / 100 * heightMeters);
+
+  /// 两点间的实际距离（m）。
+  double distance(Offset a, Offset b) => (toMeters(a) - toMeters(b)).distance;
+
+  SiteMap copyWith({List<Offset>? chargers, DateTime? updatedAt}) => SiteMap(
+    id: id,
+    name: name,
+    shortName: shortName,
+    widthMeters: widthMeters,
+    heightMeters: heightMeters,
+    devicePositions: devicePositions,
+    deviceHeadings: deviceHeadings,
+    areas: areas,
+    chargers: chargers ?? this.chargers,
+    resolutionCm: resolutionCm,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   /// 百分比矩形对应的面积（m²）。
   double areaOf(Rect percentRect) =>
@@ -236,6 +279,18 @@ class SiteMap {
       percentRect.height /
       100 *
       heightMeters;
+}
+
+/// 建图得到的墙体与房间（百分比矩形）：外墙只画边线，房间画成不可通行的灰底。
+@immutable
+class MapArea {
+  const MapArea(this.rect, {this.label, this.outline = false});
+
+  final Rect rect;
+  final String? label;
+
+  /// 只画墙体（外墙），不填充。
+  final bool outline;
 }
 
 /// 急停演练结果：各设备从下发到确认停止的耗时。

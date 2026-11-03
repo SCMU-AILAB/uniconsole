@@ -42,6 +42,15 @@ final sensorRepositoryProvider = Provider<SensorRepository>(
 final safetyRepositoryProvider = Provider<SafetyRepository>(
   (ref) => ref.watch(mockWorldProvider).safety,
 );
+final missionRepositoryProvider = Provider<MissionRepository>(
+  (ref) => ref.watch(mockWorldProvider).missions,
+);
+final recordingRepositoryProvider = Provider<RecordingRepository>(
+  (ref) => ref.watch(mockWorldProvider).recordings,
+);
+final maintenanceRepositoryProvider = Provider<MaintenanceRepository>(
+  (ref) => ref.watch(mockWorldProvider).maintenance,
+);
 
 // ---- 数据流 ----
 
@@ -68,6 +77,45 @@ final siteMapProvider = StreamProvider<SiteMap>(
 );
 final zonesProvider = StreamProvider<List<Zone>>(
   (ref) => ref.watch(safetyRepositoryProvider).watchZones(),
+);
+final alertRulesProvider = StreamProvider<List<AlertRule>>(
+  (ref) => ref.watch(alertRepositoryProvider).watchRules(),
+);
+final notifyChannelsProvider = StreamProvider<List<NotifyChannel>>(
+  (ref) => ref.watch(alertRepositoryProvider).watchChannels(),
+);
+final onCallRosterProvider = StreamProvider<OnCallRoster>(
+  (ref) => ref.watch(alertRepositoryProvider).watchRoster(),
+);
+final mapsProvider = StreamProvider<List<SiteMap>>(
+  (ref) => ref.watch(missionRepositoryProvider).watchMaps(),
+);
+final missionsProvider = StreamProvider<List<Mission>>(
+  (ref) => ref.watch(missionRepositoryProvider).watchMissions(),
+);
+final scheduleProvider = StreamProvider<List<ScheduleBlock>>(
+  (ref) => ref.watch(missionRepositoryProvider).watchSchedule(),
+);
+final recordingsProvider = StreamProvider<List<Recording>>(
+  (ref) => ref.watch(recordingRepositoryProvider).watchRecordings(),
+);
+final recordingStorageProvider = StreamProvider<RecordingStorage>(
+  (ref) => ref.watch(recordingRepositoryProvider).watchStorage(),
+);
+final firmwareProvider = StreamProvider<List<FirmwareStatus>>(
+  (ref) => ref.watch(maintenanceRepositoryProvider).watchFirmware(),
+);
+final firmwareReleaseProvider = StreamProvider<FirmwareRelease>(
+  (ref) => ref.watch(maintenanceRepositoryProvider).watchRelease(),
+);
+final batteryHealthProvider = StreamProvider<List<BatteryHealth>>(
+  (ref) => ref.watch(maintenanceRepositoryProvider).watchBattery(),
+);
+final deviceLogsProvider = StreamProvider<List<DeviceLogEntry>>(
+  (ref) => ref.watch(maintenanceRepositoryProvider).watchLogs(),
+);
+final maintenanceWindowProvider = StreamProvider<MaintenanceWindow>(
+  (ref) => ref.watch(maintenanceRepositoryProvider).watchWindow(),
 );
 final leasesProvider = StreamProvider<List<Lease>>(
   (ref) => ref.watch(leaseRepositoryProvider).watchLeases(),
@@ -169,6 +217,36 @@ final memberNameProvider = Provider.family<String?, String?>((ref, id) {
       .firstOrNull
       ?.name;
 });
+
+/// 单条告警。
+final alertProvider = Provider.family<Alert?, String>(
+  (ref, id) =>
+      ref.watch(alertsProvider).value?.where((a) => a.id == id).firstOrNull,
+);
+
+/// 告警曲线（触发前 30 分钟）。
+final alertHistoryProvider = FutureProvider.autoDispose
+    .family<AlertHistory, String>(
+      (ref, id) => ref.watch(alertRepositoryProvider).history(id),
+    );
+
+/// 某张地图上的围栏（地图与任务页）。
+final mapZonesProvider = StreamProvider.autoDispose.family<List<Zone>, String>(
+  (ref, mapId) => ref.watch(safetyRepositoryProvider).watchZones(mapId: mapId),
+);
+
+final recordingProvider = Provider.family<Recording?, String>(
+  (ref, id) => ref
+      .watch(recordingsProvider)
+      .value
+      ?.where((r) => r.id == id)
+      .firstOrNull,
+);
+
+final recordingSamplesProvider = FutureProvider.autoDispose
+    .family<RecordingSamples, String>(
+      (ref, id) => ref.watch(recordingRepositoryProvider).samples(id),
+    );
 
 /// 每秒刷新一次的当前时间（租约倒计时、「已运行 18 分钟」）。
 final clockProvider = StreamProvider.autoDispose<DateTime>(

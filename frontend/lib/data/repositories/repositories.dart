@@ -1,3 +1,5 @@
+import 'dart:ui' show Offset, Rect;
+
 import '../models/models.dart';
 
 /// 数据访问接口。界面只依赖这些接口；接真实后端（../server/docs/API.md，
@@ -48,7 +50,131 @@ abstract interface class ControlRepository {
 }
 
 abstract interface class AlertRepository {
+  /// `GET /alerts`，之后由 WS `alert` 增量更新。新的在前。
   Stream<List<Alert>> watchAlerts();
+
+  /// 触发前 30 分钟的指标曲线（`GET /devices/{id}/telemetry?from=&to=`）。
+  Future<AlertHistory> history(String alertId);
+
+  /// `PATCH /alerts/{id} {state: doing}`：当前用户确认并成为处理人。
+  Future<void> acknowledge(String alertId);
+
+  /// 指派给成员（状态变为处理中）。
+  Future<void> assign(String alertId, String memberId);
+
+  /// `PATCH /alerts/{id} {state: closed, note}`：关闭必须填写处理备注。
+  Future<void> close(String alertId, {required String note});
+
+  /// `PATCH /alerts/{id} {state: open}`。
+  Future<void> reopen(String alertId);
+
+  /// `POST /alerts/{id}/events {message}`。
+  Future<void> addNote(String alertId, String message);
+
+  /// 静默：期间不重复推送；[duration] 为 null 时取消静默。
+  Future<void> silence(String alertId, Duration? duration);
+
+  /// 远程趴下：经急停通道下发（不需要控制权，§8.1），并记入时间线。
+  Future<void> remoteDown(String alertId);
+
+  /// `GET /alert-rules`。
+  Stream<List<AlertRule>> watchRules();
+
+  /// `PATCH /alert-rules/{id} {enabled}`。
+  Future<void> setRuleEnabled(String ruleId, {required bool enabled});
+
+  /// `POST /alert-rules`，返回新规则 id。
+  Future<String> addRule({
+    required String name,
+    required AlertMetric metric,
+    required String op,
+    required double threshold,
+    required Duration duration,
+    required AlertSeverity severity,
+    String? autoAction,
+  });
+
+  Stream<List<NotifyChannel>> watchChannels();
+
+  Stream<OnCallRoster> watchRoster();
+}
+
+abstract interface class MissionRepository {
+  /// 建好的地图（Missions.dc.html 顶部地图切换）。
+  Stream<List<SiteMap>> watchMaps();
+
+  /// `GET /missions`。
+  Stream<List<Mission>> watchMissions();
+
+  /// 今日排期（各设备的任务、充电时段）。
+  Stream<List<ScheduleBlock>> watchSchedule();
+
+  /// `POST /missions`，返回新任务 id。
+  Future<String> addMission(String name, String mapId);
+
+  /// `PATCH /missions/{id} {state}`。
+  Future<void> setState(String missionId, MissionState state);
+
+  /// `PATCH /missions/{id} {waypoints}`：替换点位列表。
+  Future<void> setWaypoints(String missionId, List<Waypoint> waypoints);
+
+  /// 在地图上放置充电桩（重新建图时由机器人识别，这里允许手动标注）。
+  Future<void> addCharger(String mapId, Offset position);
+
+  /// 重新建图：由「地图更新」任务的设备执行，完成后更新地图时间。
+  Future<void> remap(String mapId);
+}
+
+abstract interface class RecordingRepository {
+  /// 录制库，新的在前。
+  Stream<List<Recording>> watchRecordings();
+
+  Stream<RecordingStorage> watchStorage();
+
+  /// 回放用的曲线与轨迹。
+  Future<RecordingSamples> samples(String recordingId);
+
+  /// 剪辑片段：截取 [from]–[to] 另存为新录制，返回新 id。
+  Future<String> clip(String recordingId, Duration from, Duration to);
+
+  /// 导出，返回文件名。
+  Future<String> export(String recordingId, ExportFormat format);
+
+  /// 带时间点的分享链接。
+  String shareLink(String recordingId, Duration at);
+}
+
+abstract interface class MaintenanceRepository {
+  Stream<List<FirmwareStatus>> watchFirmware();
+
+  Stream<FirmwareRelease> watchRelease();
+
+  /// 灰度升级：先升级第一台，自检通过后其余并行；任务中的设备等任务结束，
+  /// 离线设备上线后自动升级。
+  Future<void> upgrade(List<String> deviceIds);
+
+  /// 加入维护窗口。
+  Future<void> schedule(List<String> deviceIds);
+
+  /// 回滚到上一版本。
+  Future<void> rollback(String deviceId);
+
+  Future<void> reboot(String deviceId);
+
+  Stream<List<BatteryHealth>> watchBattery();
+
+  /// 各设备日志，新的在前。
+  Stream<List<DeviceLogEntry>> watchLogs();
+
+  Stream<MaintenanceWindow> watchWindow();
+
+  Future<void> setWindow(MaintenanceWindow window);
+
+  /// 导出诊断包，返回文件名。
+  Future<String> exportDiagnostics(List<String> deviceIds);
+
+  /// 远程终端（二次验证后；所有命令写入审计日志）。
+  Future<List<TerminalLine>> run(String deviceId, String command);
 }
 
 abstract interface class FleetRepository {
@@ -127,11 +253,11 @@ abstract interface class SafetyRepository {
 
   Stream<SiteMap> watchMap();
 
-  /// `GET /zones?map_id=`。
-  Stream<List<Zone>> watchZones();
+  /// `GET /zones?map_id=`；[mapId] 为空时为安全策略页的地图。
+  Stream<List<Zone>> watchZones({String? mapId});
 
-  /// `POST /zones`，返回新围栏 id。
-  Future<String> addZone(ZoneType type);
+  /// `POST /zones`，返回新围栏 id。[rect] 为空时放在地图中央。
+  Future<String> addZone(ZoneType type, {String? mapId, Rect? rect});
 
   /// `PATCH /zones/{id}`。
   Future<void> updateZone(Zone zone);

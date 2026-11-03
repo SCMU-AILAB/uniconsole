@@ -284,6 +284,7 @@ abstract final class MockData {
   static const siteMap = SiteMap(
     id: 'showroom-1f',
     name: '展厅 1F + B 区',
+    shortName: '展厅 1F',
     widthMeters: 20,
     heightMeters: 12,
     devicePositions: {
@@ -293,6 +294,7 @@ abstract final class MockData {
       'go2-02': Offset(22, 30),
       'go2-03': Offset(78, 74),
     },
+    areas: [MapArea(Rect.fromLTRB(6, 8, 94, 92), outline: true)],
   );
 
   static const zones = [
@@ -339,6 +341,18 @@ abstract final class MockData {
       scope: 'Charlie、Golf',
       schedule: '始终',
       action: '非白名单设备拒绝路径规划',
+    ),
+    // Missions.dc.html：B 区巡检层的配电柜。
+    Zone(
+      id: 'z5',
+      mapId: 'b-patrol',
+      name: '配电柜',
+      type: ZoneType.ban,
+      rect: Rect.fromLTWH(70, 70, 14, 16),
+      rule: '禁止进入',
+      scope: '全部设备',
+      schedule: '始终',
+      action: '在边界外 0.5 m 停止并告警',
     ),
   ];
 
