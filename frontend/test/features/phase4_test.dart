@@ -1,56 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/app/destinations.dart';
-import 'package:uniconsole/core/theme/theme.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
 import 'package:uniconsole/data/models/models.dart';
 import 'package:uniconsole/data/providers.dart';
 import 'package:uniconsole/features/fleet/fleet_page.dart';
 import 'package:uniconsole/features/leases/leases_page.dart';
 import 'package:uniconsole/features/safety/safety_page.dart';
-import 'package:uniconsole/main.dart';
 
-/// 打开应用并逐帧推进（页面上有每秒刷新的倒计时，不能 pumpAndSettle）。
-Future<ProviderContainer> open(
-  WidgetTester tester, {
-  required String location,
-  double width = 1440,
-  double height = 1200,
-}) async {
-  tester.view.physicalSize = Size(width, height);
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.reset);
-  // 容器由 ProviderScope 持有：卸载界面即释放，mock 的定时器随之停止。
-  await tester.pumpWidget(
-    ProviderScope(child: UniConsoleApp(initialLocation: location)),
-  );
-  final container = ProviderScope.containerOf(
-    tester.element(find.byType(UniConsoleApp)),
-  );
-  container.read(themeModeProvider.notifier).set(ThemeMode.light);
-  await settle(tester);
-  return container;
-}
-
-Future<void> settle(WidgetTester tester) async {
-  for (var i = 0; i < 8; i++) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-}
-
-Future<void> close(WidgetTester tester) async {
-  await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(seconds: 1));
-}
-
-Future<void> tapText(WidgetTester tester, String text) async {
-  final f = find.text(text);
-  await tester.ensureVisible(f.first);
-  await tester.tap(f.first);
-  await settle(tester);
-}
+import 'helpers.dart';
 
 void main() {
   group('多机联调', () {
@@ -85,7 +44,10 @@ void main() {
       await settle(tester);
       final receipt = container.read(fleetSessionProvider('s12'))!.lastReceipt!;
       expect(receipt.acks.map((a) => a.deviceId), contains('go2-02'));
-      expect(find.text('回执 ${receipt.acks.last.latency!.inMilliseconds} ms'), findsWidgets);
+      expect(
+        find.text('回执 ${receipt.acks.last.latency!.inMilliseconds} ms'),
+        findsWidgets,
+      );
 
       await tapText(tester, '纵队');
       expect(
@@ -108,7 +70,9 @@ void main() {
       expect(stand().onPressed, isNull);
       expect(
         tester
-            .widget<SecondaryButton>(find.widgetWithText(SecondaryButton, '全体趴下'))
+            .widget<SecondaryButton>(
+              find.widgetWithText(SecondaryButton, '全体趴下'),
+            )
             .onPressed,
         isNotNull,
       );
@@ -148,10 +112,7 @@ void main() {
   group('控制权', () {
     testWidgets('表格顺序与设计稿一致；4 个活动租约、1 个待审批', (tester) async {
       await open(tester, location: Routes.leases);
-      expect(
-        find.text('同一时刻每台设备只有一个控制者 · 4 个活动租约 · 1 个待审批'),
-        findsOneWidget,
-      );
+      expect(find.text('同一时刻每台设备只有一个控制者 · 4 个活动租约 · 1 个待审批'), findsOneWidget);
       final names = ['Alpha', 'Charlie', 'Echo', 'Foxtrot', 'Bravo', 'Delta'];
       final ys = [
         for (final n in names) tester.getTopLeft(find.text(n).first).dy,
@@ -212,7 +173,10 @@ void main() {
   group('安全策略', () {
     testWidgets('全局急停：红色提示条、所有在线设备急停；解除需确认', (tester) async {
       final container = await open(tester, location: Routes.safety);
-      expect(find.textContaining('安全状态正常 · 4 个围栏生效 · 上次急停演练 10 月 28 日'), findsWidgets);
+      expect(
+        find.textContaining('安全状态正常 · 4 个围栏生效 · 上次急停演练 10 月 28 日'),
+        findsWidgets,
+      );
       await tester.tap(find.widgetWithText(EmergencyStopButton, '全局急停'));
       await settle(tester);
       expect(find.text('全局急停已触发'), findsOneWidget);
@@ -241,7 +205,10 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
       await settle(tester);
       expect(container.read(safetyProvider).value!.globalEstop, isTrue);
-      expect(container.read(mockWorldProvider).fleet.robot('g1-01')!.estop, isTrue);
+      expect(
+        container.read(mockWorldProvider).fleet.robot('g1-01')!.estop,
+        isTrue,
+      );
       await close(tester);
     });
 

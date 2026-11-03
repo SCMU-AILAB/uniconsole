@@ -45,7 +45,10 @@ void main() {
     });
 
     test('转移给自动任务；联调会话持有的设备不能单独转移', () async {
-      await world.leases.transfer('go2-01', const LeaseTarget.task('scheduler'));
+      await world.leases.transfer(
+        'go2-01',
+        const LeaseTarget.task('scheduler'),
+      );
       expect(world.leases.lease('go2-01')!.holderKind, LeaseHolderKind.task);
       await expectLater(
         world.leases.transfer('g1-01', const LeaseTarget.user('linyue')),
@@ -143,7 +146,14 @@ void main() {
       await user.safety.setGlobalEstop(active: true);
       expect(user.safety.state.globalEstop, isTrue);
       expect(user.safety.state.estopBy, '周明');
-      for (final id in ['go2-01', 'go2-02', 'go2-03', 'b2-01', 'g1-01', 'go2-04']) {
+      for (final id in [
+        'go2-01',
+        'go2-02',
+        'go2-03',
+        'b2-01',
+        'g1-01',
+        'go2-04',
+      ]) {
         expect(user.fleet.robot(id)!.estop, isTrue, reason: id);
       }
       expect(user.sessions.session('s12')!.paused, isTrue);

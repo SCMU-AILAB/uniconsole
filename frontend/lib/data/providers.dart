@@ -236,11 +236,8 @@ final mapZonesProvider = StreamProvider.autoDispose.family<List<Zone>, String>(
 );
 
 final recordingProvider = Provider.family<Recording?, String>(
-  (ref, id) => ref
-      .watch(recordingsProvider)
-      .value
-      ?.where((r) => r.id == id)
-      .firstOrNull,
+  (ref, id) =>
+      ref.watch(recordingsProvider).value?.where((r) => r.id == id).firstOrNull,
 );
 
 final recordingSamplesProvider = FutureProvider.autoDispose

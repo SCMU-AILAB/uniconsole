@@ -5,6 +5,7 @@ import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/theme/theme.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
 import 'package:uniconsole/features/control/control_page.dart';
+import 'package:uniconsole/features/alerts/alerts_page.dart';
 import 'package:uniconsole/features/devices/devices_page.dart';
 import 'package:uniconsole/features/settings/settings_page.dart';
 import 'package:uniconsole/main.dart';
@@ -104,7 +105,7 @@ void main() {
     expect(find.byType(DevicesPage), findsOneWidget);
     await tester.tap(find.bySemanticsLabel(RegExp('^告警中心')));
     await tester.pumpAndSettle();
-    expect(find.text('「告警中心」将在第 5 阶段实现'), findsOneWidget);
+    expect(find.byType(AlertsPage), findsOneWidget);
     expect(
       tester.widget<AppSidebar>(find.byType(AppSidebar)).selectedId,
       'alerts',

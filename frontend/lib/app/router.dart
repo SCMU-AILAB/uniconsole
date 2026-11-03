@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../core/layout/app_route_page.dart';
 import '../core/widgets/widgets.dart';
 import '../core/theme/theme.dart';
+import '../features/alerts/alert_detail_page.dart';
+import '../features/alerts/alerts_page.dart';
 import '../features/common/placeholder_page.dart';
 import '../features/control/control_page.dart';
 import '../features/devices/device_detail_page.dart';
@@ -120,22 +122,23 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
             phase: 5,
             inspector: '点位详情',
           ),
-          placeholder(
-            '/alerts',
-            title: '告警中心',
-            mobileTitle: '告警',
-            icon: AppIcons.alerts,
-            design: 'Alerts.dc.html · MobileAlerts.dc.html',
-            phase: 5,
-            routes: [
-              placeholder(
-                ':id',
-                title: '告警详情',
-                icon: AppIcons.alerts,
-                design: 'MobileAlerts.dc.html',
-                phase: 5,
-              ),
-            ],
+          GoRoute(
+            path: '/alerts/:id',
+            pageBuilder: (context, state) {
+              final id = state.pathParameters['id']!;
+              // 移动端是告警详情；桌面宽度下显示告警中心并选中该告警。
+              final mobile = LayoutSize.ofContext(context).isMobile;
+              return page(
+                state,
+                mobile
+                    ? AlertDetailPage(alertId: id)
+                    : AlertsPage(selectId: id),
+              );
+            },
+          ),
+          GoRoute(
+            path: Routes.alerts,
+            pageBuilder: (context, state) => page(state, const AlertsPage()),
           ),
           placeholder(
             '/recordings',

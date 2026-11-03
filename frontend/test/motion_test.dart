@@ -80,21 +80,21 @@ void main() {
 
   testWidgets('侧边栏切换页面是瞬时的（不做转场）', (tester) async {
     await pumpApp(tester);
-    await tester.tap(find.bySemanticsLabel(RegExp('^告警中心')));
+    await tester.tap(find.bySemanticsLabel(RegExp('^成员与权限')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 16));
     expect(find.byType(DevicesPage), findsNothing);
-    expect(find.text('「告警中心」将在第 5 阶段实现'), findsOneWidget);
+    expect(find.text('「成员与权限」将在第 6 阶段实现'), findsOneWidget);
   });
 
   testWidgets('层级进入（push）以 iOS 推入动画滑入', (tester) async {
     await pumpApp(tester, width: 390, height: 844, location: Routes.me);
-    await tester.tap(find.text('地图与任务'));
+    await tester.tap(find.text('成员与权限'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
-    final mid = tester.getTopLeft(find.text('「地图与任务」将在第 5 阶段实现')).dx;
+    final mid = tester.getTopLeft(find.text('「成员与权限」将在第 6 阶段实现')).dx;
     await tester.pumpAndSettle();
-    final end = tester.getTopLeft(find.text('「地图与任务」将在第 5 阶段实现')).dx;
+    final end = tester.getTopLeft(find.text('「成员与权限」将在第 6 阶段实现')).dx;
     expect(mid, greaterThan(end + 20), reason: '推入过程中页面应在右侧滑入');
     // 返回按钮出现。
     expect(find.bySemanticsLabel('返回'), findsOneWidget);
