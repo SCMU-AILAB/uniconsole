@@ -2,10 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
+import 'package:uniconsole/data/mock/mock_data_ops.dart';
 import 'package:uniconsole/data/models/models.dart';
 import 'package:uniconsole/data/providers.dart';
 
 import 'helpers.dart';
+
+/// 今日已执行：开始时间已过的巡检排期块（与页面同一规则）。
+int runsToday() => MockOpsData.schedule()
+    .where(
+      (b) => b.kind == ScheduleKind.run && !b.start.isAfter(DateTime.now()),
+    )
+    .length;
 
 void main() {
   group('告警中心', () {
@@ -109,9 +117,82 @@ void main() {
     });
   });
 
+  group('地图与任务', () {
+    testWidgets('默认选中巡检路线 B-2 第 3 个点位；统计来自同一数据源', (tester) async {
+      await open(tester, location: Routes.missions);
+      expect(
+        find.text('3 张地图 · 4 个任务 · 今日已执行 ${runsToday()} 次'),
+        findsOneWidget,
+      );
+      expect(find.text('B-2-03 · 配电仪表'), findsOneWidget);
+      expect(find.text('(10.9 m, 4.4 m)'), findsOneWidget);
+      expect(find.text('8 个点位 · 全长 56 m · 预计 18 分钟'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel(RegExp('^点位 5 ')));
+      await settle(tester);
+      expect(find.text('B-2-05 · 窗户'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('添加点位：点按地图追加到末尾并选中', (tester) async {
+      final container = await open(tester, location: Routes.missions);
+      await tapText(tester, '添加点位');
+      final map = tester.getRect(find.byType(FloorMapView));
+      await tester.tapAt(
+        map.topLeft + Offset(map.width * 0.5, map.height * 0.9),
+      );
+      await settle(tester);
+      final m = container
+          .read(missionsProvider)
+          .value!
+          .firstWhere((m) => m.id == 'patrol-b2');
+      expect(m.waypoints, hasLength(9));
+      expect(find.text('点位 9'), findsWidgets);
+      await close(tester);
+    });
+
+    testWidgets('拖动点位后坐标随之更新；添加到达后动作', (tester) async {
+      final container = await open(tester, location: Routes.missions);
+      Offset pos() => container
+          .read(missionsProvider)
+          .value!
+          .firstWhere((m) => m.id == 'patrol-b2')
+          .waypoints[2]
+          .position;
+      final before = pos();
+      await tester.drag(
+        find.bySemanticsLabel(RegExp('^点位 3 ')),
+        const Offset(40, 40),
+      );
+      await settle(tester);
+      expect(pos().dx, greaterThan(before.dx));
+      expect(pos().dy, greaterThan(before.dy));
+
+      await tapText(tester, '＋ 添加动作');
+      await tapText(tester, '热成像 · 温度 > 45 °C 告警');
+      final wp = container
+          .read(missionsProvider)
+          .value!
+          .firstWhere((m) => m.id == 'patrol-b2')
+          .waypoints[2];
+      expect(wp.actions.last.name, '热成像');
+      await close(tester);
+    });
+
+    testWidgets('点任务切换地图：仓库夜巡在 C 区仓库', (tester) async {
+      await open(tester, location: Routes.missions);
+      await tapText(tester, '仓库夜巡 C-1');
+      expect(
+        tester.widget<FloorMapView>(find.byType(FloorMapView)).semanticLabel,
+        '地图 · C 区仓库',
+      );
+      expect(find.text('起点 · 充电桩 #3'), findsOneWidget);
+      await close(tester);
+    });
+  });
+
   for (final width in [1440.0, 1000.0, 760.0, 390.0]) {
     testWidgets('第 5 阶段页面在 ${width.toInt()} 宽下无溢出', (tester) async {
-      for (final loc in [Routes.alerts, Routes.alert('a1')]) {
+      for (final loc in [Routes.alerts, Routes.alert('a1'), Routes.missions]) {
         await open(tester, location: loc, width: width, height: 900);
         expect(tester.takeException(), isNull, reason: loc);
         await close(tester);

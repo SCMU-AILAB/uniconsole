@@ -66,6 +66,8 @@ class SegmentedControl<T> extends StatelessWidget {
     final bold = base.copyWith(fontWeight: FontWeight.w600);
     final scaler = MediaQuery.textScalerOf(context);
     final selected = options.indexWhere((o) => o.value == value);
+    // 选项还没加载（如数据流的第一帧）时不占位。
+    if (options.isEmpty) return const SizedBox.shrink();
 
     return Semantics(
       container: true,

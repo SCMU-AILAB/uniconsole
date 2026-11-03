@@ -14,6 +14,7 @@ import '../features/fleet/fleet_page.dart';
 import '../features/gallery/gallery_page.dart';
 import '../features/leases/leases_page.dart';
 import '../features/me/me_page.dart';
+import '../features/missions/missions_page.dart';
 import '../features/sensors/sensors_page.dart';
 import '../features/safety/safety_page.dart';
 import '../features/settings/settings_page.dart';
@@ -114,13 +115,9 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
               FleetPage(sessionId: state.pathParameters['sessionId']),
             ),
           ),
-          placeholder(
-            '/missions',
-            title: '地图与任务',
-            icon: AppIcons.missions,
-            design: 'Missions.dc.html',
-            phase: 5,
-            inspector: '点位详情',
+          GoRoute(
+            path: Routes.missions,
+            pageBuilder: (context, state) => page(state, const MissionsPage()),
           ),
           GoRoute(
             path: '/alerts/:id',
