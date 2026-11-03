@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show Offset;
 
 import '../models/models.dart';
 import '../repositories/repositories.dart';
@@ -38,13 +39,21 @@ class MockRecordingRepository implements RecordingRepository {
         100 - (i < 40 ? 40 + math.sin(i / 2) * 6 : 72 + (rnd() - 0.5) * 4),
       );
     }
-    final single = (r?.deviceIds.length ?? 1) == 1;
+    // 点云：走廊两侧墙 + 前方墙（设计稿 160 个点，视图 8 m 宽，机器人在 50% / 55%）。
+    final cloud = <Offset>[];
+    for (var i = 0; i < 160; i++) {
+      final r = rnd();
+      final x = r < 0.35 ? 24 : (r < 0.7 ? 76 : 24 + rnd() * 52);
+      final y = r < 0.7 ? 8 + rnd() * 88 : 10.0;
+      final px = x + (rnd() - 0.5) * 1.5, py = y + (rnd() - 0.5) * 2;
+      cloud.add(Offset((px - 50) / 100 * 8, (55 - py) / 100 * 8));
+    }
     return RecordingSamples(
       chartTitle: source == 'r1' ? 'RL_calf 温度 · 速度' : '最高电机温度 · 速度',
       temperature: temp,
       velocity: vel,
       trajectory: MockOpsData.trajectories[source] ?? const [],
-      cloudSeed: single ? 5 : 11,
+      cloud: cloud,
     );
   }
 

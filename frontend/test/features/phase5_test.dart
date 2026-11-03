@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
@@ -9,6 +10,9 @@ import 'package:uniconsole/data/providers.dart';
 import 'helpers.dart';
 
 /// 今日已执行：开始时间已过的巡检排期块（与页面同一规则）。
+/// 回放控制条上的「当前 / 总长」（Charlie 过热前后共 38 分钟）。
+Finder at(String t) => find.text('$t / 00:38:00', findRichText: true);
+
 int runsToday() => MockOpsData.schedule()
     .where(
       (b) => b.kind == ScheduleKind.run && !b.start.isAfter(DateTime.now()),
@@ -186,6 +190,63 @@ void main() {
         '地图 · C 区仓库',
       );
       expect(find.text('起点 · 充电桩 #3'), findsOneWidget);
+      await close(tester);
+    });
+  });
+
+  group('录制与回放', () {
+    testWidgets('默认打开第一条录制，停在第一个告警事件；±10 s 与点事件跳转', (tester) async {
+      await open(tester, location: Routes.recordings);
+      expect(find.text('回放 · Charlie 过热前后'), findsOneWidget);
+      expect(at('00:12:42'), findsOneWidget);
+      await tapText(tester, '+10 s');
+      expect(at('00:12:52'), findsOneWidget);
+      await tapText(tester, '过热告警');
+      expect(at('00:17:29'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('2× 播放：1 秒后前进 2 秒；空格暂停', (tester) async {
+      await open(tester, location: Routes.recording('r1'));
+      await tapText(tester, '2×');
+      await tester.tap(find.bySemanticsLabel('播放'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(at('00:12:44'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump(const Duration(seconds: 1));
+      expect(at('00:12:44'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('告警的「回放触发前后 60 秒」链接带时间点', (tester) async {
+      await open(tester, location: Routes.alerts);
+      await tapText(tester, '回放触发前后 60 秒');
+      expect(find.text('回放 · Charlie 过热前后'), findsOneWidget);
+      expect(at('00:16:29'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('搜索录制库；切换录制；剪辑片段另存为新录制', (tester) async {
+      final container = await open(tester, location: Routes.recordings);
+      await tester.enterText(find.byType(EditableText).first, '联调');
+      await settle(tester);
+      expect(find.text('巡检 B-2 · 上午'), findsNothing);
+      await tapText(tester, '联调会话 #12');
+      expect(find.text('回放 · 联调会话 #12'), findsOneWidget);
+
+      await tapText(tester, '剪辑片段');
+      await tapText(tester, '另存为片段');
+      expect(find.text('回放 · 联调会话 #12 · 片段'), findsOneWidget);
+      expect(container.read(recordingsProvider).value, hasLength(5));
+      await close(tester);
+    });
+
+    testWidgets('手机：录制库列表点开进入回放', (tester) async {
+      await open(tester, location: Routes.recordings, width: 390, height: 844);
+      await tapText(tester, '步态调试');
+      expect(find.text('回放 · 步态调试'), findsWidgets);
       await close(tester);
     });
   });

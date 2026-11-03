@@ -94,7 +94,7 @@ class RecordingSamples {
     required this.temperature,
     required this.velocity,
     required this.trajectory,
-    required this.cloudSeed,
+    required this.cloud,
   });
 
   final String chartTitle;
@@ -104,8 +104,8 @@ class RecordingSamples {
   /// 地图上的轨迹（百分比坐标，按时间均匀分布）。
   final List<Offset> trajectory;
 
-  /// 点云帧的随机种子（同一录制每次回放一致）。
-  final int cloudSeed;
+  /// 点云帧（机器人坐标系，米）。
+  final List<Offset> cloud;
 }
 
 /// 录制存储（Replay.dc.html 录制库底部说明）。

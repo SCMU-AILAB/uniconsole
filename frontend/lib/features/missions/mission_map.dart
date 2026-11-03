@@ -303,10 +303,7 @@ class _MissionMapState extends ConsumerState<MissionMap> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         sized,
-        if (info != null) ...[
-          const SizedBox(height: AppSpacing.x3),
-          info,
-        ],
+        if (info != null) ...[const SizedBox(height: AppSpacing.x3), info],
         const SizedBox(height: AppSpacing.x3),
         SingleChildScrollView(scrollDirection: Axis.horizontal, child: tools),
       ],

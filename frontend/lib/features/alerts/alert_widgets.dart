@@ -231,16 +231,22 @@ class AlertActions {
       context.push(Routes.control(alert.deviceId), extra: NavIntent.push);
 
   /// 回放触发前后 60 秒：跳到录制里第一个告警事件前 60 秒。
-  void openReplay() {
+  Future<void> openReplay() async {
     final id = alert.recordingId;
     if (id == null) return;
-    final r = ref.read(recordingProvider(id));
-    final trigger = r?.events
-        .where(
-          (e) => e.tone == EventTone.critical || e.tone == EventTone.warning,
-        )
-        .firstOrNull
-        ?.offset;
+    // 告警页没有订阅录制列表（未订阅的 provider 不会产出数据），直接从仓库取一次。
+    final all = await ref
+        .read(recordingRepositoryProvider)
+        .watchRecordings()
+        .first;
+    if (!context.mounted) return;
+    final r = all.where((r) => r.id == id).firstOrNull;
+    // 触发点：录制里的告警事件（严重优先，其次警告）。
+    final events = r?.events ?? const <RecordingEvent>[];
+    final trigger =
+        (events.where((e) => e.tone == EventTone.critical).firstOrNull ??
+                events.where((e) => e.tone == EventTone.warning).firstOrNull)
+            ?.offset;
     final from = trigger == null
         ? Duration.zero
         : trigger - const Duration(seconds: 60);

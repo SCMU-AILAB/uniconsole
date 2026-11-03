@@ -14,6 +14,7 @@ import '../features/fleet/fleet_page.dart';
 import '../features/gallery/gallery_page.dart';
 import '../features/leases/leases_page.dart';
 import '../features/me/me_page.dart';
+import '../features/replay/replay_page.dart';
 import '../features/missions/missions_page.dart';
 import '../features/sensors/sensors_page.dart';
 import '../features/safety/safety_page.dart';
@@ -137,21 +138,24 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
             path: Routes.alerts,
             pageBuilder: (context, state) => page(state, const AlertsPage()),
           ),
-          placeholder(
-            '/recordings',
-            title: '录制与回放',
-            icon: AppIcons.replay,
-            design: 'Replay.dc.html',
-            phase: 5,
-            routes: [
-              placeholder(
-                ':id',
-                title: '录制回放',
-                icon: AppIcons.replay,
-                design: 'Replay.dc.html',
-                phase: 5,
-              ),
-            ],
+          GoRoute(
+            path: '/recordings/:id',
+            pageBuilder: (context, state) {
+              final t = int.tryParse(state.uri.queryParameters['t'] ?? '');
+              return page(
+                state,
+                ReplayPage(
+                  // 换录制或时间点时重新开始播放状态。
+                  key: ValueKey(state.uri.toString()),
+                  recordingId: state.pathParameters['id'],
+                  startAt: t == null ? null : Duration(seconds: t),
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: Routes.recordings,
+            pageBuilder: (context, state) => page(state, const ReplayPage()),
           ),
           placeholder(
             '/maintenance',
