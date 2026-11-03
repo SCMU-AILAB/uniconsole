@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'pressable.dart';
 
 enum LogLevel { normal, info, success, warning, error }
 
@@ -41,6 +42,9 @@ class LogConsole extends StatelessWidget {
     this.selectedTab = 0,
     this.headerNote,
     this.semanticLabel = '日志',
+    this.onTabSelected,
+    this.input,
+    this.inputPrompt,
   });
 
   final List<LogLine> lines;
@@ -55,6 +59,13 @@ class LogConsole extends StatelessWidget {
   final int selectedTab;
   final String? headerNote;
   final String semanticLabel;
+
+  /// 设置后终端标签可点击切换。
+  final ValueChanged<int>? onTabSelected;
+
+  /// 终端末尾的输入框（替代光标行），显示在 [inputPrompt] 提示符之后。
+  final Widget? input;
+  final String? inputPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +154,21 @@ class LogConsole extends StatelessWidget {
               ),
             ],
           ),
-      if (terminal && showCursor)
+      if (terminal && input != null)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text.rich(promptSpan(inputPrompt ?? '~'), style: base),
+            Expanded(
+              child: DefaultTextStyle.merge(
+                style: base.copyWith(color: tc.cursor),
+                child: input!,
+              ),
+            ),
+          ],
+        )
+      else if (terminal && showCursor)
         Text.rich(
           TextSpan(
             children: [
@@ -220,29 +245,7 @@ class LogConsole extends StatelessWidget {
                             children: [
                               for (var i = 0; i < tabs.length; i++) ...[
                                 if (i > 0) const SizedBox(width: AppSpacing.x2),
-                                Container(
-                                  height: 26,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.x3,
-                                  ),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: i == selectedTab
-                                        ? tc.tabSelected
-                                        : null,
-                                    borderRadius: BorderRadius.circular(
-                                      AppRadius.xs,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    tabs[i],
-                                    style: t.subhead.copyWith(
-                                      color: i == selectedTab
-                                          ? tc.cursor
-                                          : tc.textSecondary,
-                                    ),
-                                  ),
-                                ),
+                                _tab(context, i),
                               ],
                             ],
                           ),
@@ -271,6 +274,34 @@ class LogConsole extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _tab(BuildContext context, int i) {
+    final tc = context.colors.terminal;
+    final on = i == selectedTab;
+    Widget chip(bool pressed) => Container(
+      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: on || pressed ? tc.tabSelected : null,
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+      ),
+      child: Text(
+        tabs[i],
+        style: context.type.subhead.copyWith(
+          color: on ? tc.cursor : tc.textSecondary,
+        ),
+      ),
+    );
+    if (onTabSelected == null) return chip(false);
+    return Pressable(
+      onTap: () => onTabSelected!(i),
+      selected: on,
+      semanticLabel: '终端会话 ${tabs[i]}',
+      focusRadius: AppRadius.xs,
+      builder: (context, st) => chip(st.pressed),
     );
   }
 }

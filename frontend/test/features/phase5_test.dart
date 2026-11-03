@@ -6,6 +6,7 @@ import 'package:uniconsole/core/widgets/widgets.dart';
 import 'package:uniconsole/data/mock/mock_data_ops.dart';
 import 'package:uniconsole/data/models/models.dart';
 import 'package:uniconsole/data/providers.dart';
+import 'package:uniconsole/features/maintenance/maintenance_widgets.dart';
 
 import 'helpers.dart';
 
@@ -247,6 +248,67 @@ void main() {
       await open(tester, location: Routes.recordings, width: 390, height: 844);
       await tapText(tester, '步态调试');
       expect(find.text('回放 · 步态调试'), findsWidgets);
+      await close(tester);
+    });
+  });
+
+  group('设备运维', () {
+    testWidgets('统计来自同一数据源；立即升级按灰度规则排队', (tester) async {
+      final container = await open(tester, location: Routes.maintenance);
+      expect(
+        find.text('4 台可升级 · 1 台建议更换电池 · 维护窗口 每天 02:00–04:00'),
+        findsOneWidget,
+      );
+      expect(find.text('已选 2 台 · 灰度发布：先升级 1 台，自检通过后其余并行'), findsOneWidget);
+      expect(find.text('Delta 预计 3 周后低于 80%，建议安排更换。'), findsOneWidget);
+
+      await tapText(tester, '立即升级');
+      await tester.tap(find.widgetWithText(PrimaryButton, '开始升级'));
+      await settle(tester);
+      final world = container.read(mockWorldProvider);
+      // Foxtrot 正在升级（作为灰度），Bravo 排队；Echo 在联调会话中，等任务结束。
+      expect(world.maintenance.status('go2-02')!.state, FirmwareState.queued);
+      expect(
+        world.maintenance.status('g1-01')!.state,
+        FirmwareState.waitingTask,
+      );
+      expect(find.text('排队中 · 等待灰度设备自检通过'), findsOneWidget);
+      expect(find.text('已选 0 台 · 灰度发布：先升级 1 台，自检通过后其余并行'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('远程终端执行命令；日志按级别筛选', (tester) async {
+      await open(tester, location: Routes.maintenance);
+      expect(
+        find.textContaining('/dev/nvme0n1p3', findRichText: true),
+        findsOneWidget,
+      );
+      final input = find.descendant(
+        of: find.byType(TerminalCard),
+        matching: find.byType(EditableText),
+      );
+      await tester.enterText(input, 'uptime');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await settle(tester);
+      expect(
+        find.textContaining(' up 3h 12min', findRichText: true),
+        findsOneWidget,
+      );
+
+      await tapText(tester, 'ERROR');
+      expect(find.text('motor[RL_calf] temp 68.2C > 60.0C'), findsOneWidget);
+      expect(find.text('gait.switch(low_speed) ok'), findsNothing);
+      await close(tester);
+    });
+
+    testWidgets('维护窗口设置：改为 03:00 开始', (tester) async {
+      await open(tester, location: Routes.maintenance);
+      await tapText(tester, '维护窗口设置');
+      await tapText(tester, '02:00');
+      await tapText(tester, '03:00');
+      await tester.tap(find.widgetWithText(PrimaryButton, '保存'));
+      await settle(tester);
+      expect(find.textContaining('维护窗口 每天 03:00–05:00'), findsOneWidget);
       await close(tester);
     });
   });

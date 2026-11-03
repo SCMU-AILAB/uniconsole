@@ -13,6 +13,7 @@ import '../features/devices/devices_page.dart';
 import '../features/fleet/fleet_page.dart';
 import '../features/gallery/gallery_page.dart';
 import '../features/leases/leases_page.dart';
+import '../features/maintenance/maintenance_page.dart';
 import '../features/me/me_page.dart';
 import '../features/replay/replay_page.dart';
 import '../features/missions/missions_page.dart';
@@ -157,12 +158,10 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
             path: Routes.recordings,
             pageBuilder: (context, state) => page(state, const ReplayPage()),
           ),
-          placeholder(
-            '/maintenance',
-            title: '设备运维',
-            icon: AppIcons.maintenance,
-            design: 'Maintenance.dc.html',
-            phase: 5,
+          GoRoute(
+            path: Routes.maintenance,
+            pageBuilder: (context, state) =>
+                page(state, const MaintenancePage()),
           ),
           GoRoute(
             path: Routes.safety,

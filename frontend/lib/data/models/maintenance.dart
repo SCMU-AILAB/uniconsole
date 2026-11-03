@@ -128,8 +128,9 @@ class MaintenanceWindow {
   final Duration start;
   final Duration end;
 
+  /// 跨零点的窗口（23:00 开始 4 小时）结束于次日 03:00。
   static String _hm(Duration d) =>
-      '${d.inHours.toString().padLeft(2, '0')}:${(d.inMinutes % 60).toString().padLeft(2, '0')}';
+      '${(d.inHours % 24).toString().padLeft(2, '0')}:${(d.inMinutes % 60).toString().padLeft(2, '0')}';
 
   String get label => '${_hm(start)}–${_hm(end)}';
   String get startLabel => _hm(start);
