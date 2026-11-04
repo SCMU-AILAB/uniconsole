@@ -74,6 +74,11 @@ class MePage extends ConsumerWidget {
                 title: '组件预览',
                 onTap: () => open('gallery'),
               ),
+              GroupedListRow(
+                leading: const _IconTile(icon: AppIcons.alerts),
+                title: '模拟告警推送',
+                onTap: () => ref.read(mockWorldProvider).alerts.raiseDemo(),
+              ),
             ],
           ),
       ],

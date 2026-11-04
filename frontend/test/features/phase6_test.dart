@@ -205,6 +205,62 @@ void main() {
     });
   });
 
+  group('告警推送', () {
+    testWidgets('新告警弹出横幅；点按打开详情', (tester) async {
+      final container = await open(
+        tester,
+        location: Routes.devices,
+        width: 390,
+        height: 844,
+      );
+      expect(find.textContaining('UNICONSOLE'), findsNothing, reason: '已有告警不弹');
+      final id = container.read(mockWorldProvider).alerts.raiseDemo();
+      await settle(tester);
+      expect(find.text('Charlie 右后腿电机过热'), findsOneWidget);
+      await tester.tap(find.text('Charlie 右后腿电机过热'));
+      await settle(tester);
+      await settle(tester);
+      expect(find.text('右后腿电机过热'), findsWidgets);
+      expect(find.text('Charlie 右后腿电机过热'), findsNothing);
+      expect(container.read(alertProvider(id))!.state, AlertState.open);
+      await close(tester);
+    });
+
+    testWidgets('按住横幅快速确认', (tester) async {
+      final container = await open(tester, location: Routes.members);
+      final id = container.read(mockWorldProvider).alerts.raiseDemo();
+      await settle(tester);
+      await tester.longPress(find.text('Charlie 右后腿电机过热'));
+      await settle(tester);
+      await tester.tap(find.text('确认处理'));
+      await settle(tester);
+      expect(container.read(alertProvider(id))!.state, AlertState.doing);
+      await close(tester);
+    });
+
+    testWidgets('「设置 › 通知」关闭严重告警时不弹', (tester) async {
+      final container = await open(tester, location: Routes.members);
+      await container
+          .read(preferencesRepositoryProvider)
+          .update((p) => p.copyWith(notifyCritical: NotifyStyle.off));
+      container.read(mockWorldProvider).alerts.raiseDemo();
+      await settle(tester);
+      expect(find.text('Charlie 右后腿电机过热'), findsNothing);
+      await close(tester);
+    });
+
+    testWidgets('6 秒后自动收起', (tester) async {
+      final container = await open(tester, location: Routes.members);
+      container.read(mockWorldProvider).alerts.raiseDemo();
+      await settle(tester);
+      expect(find.text('Charlie 右后腿电机过热'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      await settle(tester);
+      expect(find.text('Charlie 右后腿电机过热'), findsNothing);
+      await close(tester);
+    });
+  });
+
   for (final width in [1440.0, 1000.0, 760.0, 390.0]) {
     testWidgets('第 6 阶段页面在 ${width.toInt()} 宽下无溢出', (tester) async {
       for (final loc in [
@@ -217,6 +273,7 @@ void main() {
         '/settings/net',
         '/settings/notify',
         '/settings/account',
+        Routes.me,
       ]) {
         await open(tester, location: loc, width: width, height: 900);
         expect(tester.takeException(), isNull, reason: loc);

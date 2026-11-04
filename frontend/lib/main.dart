@@ -46,6 +46,17 @@ class _UniConsoleAppState extends ConsumerState<UniConsoleApp> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    if (debugDemoPush) {
+      Future<void>.delayed(
+        const Duration(seconds: 1),
+        () => ref.read(mockWorldProvider).alerts.raiseDemo(),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _router.dispose();
     super.dispose();

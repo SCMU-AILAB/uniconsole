@@ -7,6 +7,7 @@ import '../core/layout/app_shell.dart';
 import '../core/theme/theme.dart';
 import '../core/widgets/widgets.dart';
 import '../data/providers.dart';
+import '../features/alerts/alert_push.dart';
 import '../features/fleet/fleet_widgets.dart';
 import 'command_palette.dart';
 import 'destinations.dart';
@@ -167,24 +168,26 @@ class ShellScaffold extends ConsumerWidget {
       },
       child: Focus(
         autofocus: true,
-        child: AppShell(
-          sidebarSections: sections,
-          selectedSidebarId: sidebarIdFor(location),
-          onSidebarSelect: go,
-          tabs: tabs,
-          selectedTabId: tabIdFor(location),
-          onTabSelect: go,
-          user: me == null
-              ? null
-              : SidebarUser(
-                  name: me.name,
-                  role: me.role.label,
-                  color: context.colors.avatarPalette.first,
-                ),
-          onUserSettings: () => go('settings'),
-          immersive: tabIdFor(location) == 'control',
-          sidebarIconSize: prefs.sidebarIconSize.icon,
-          child: child,
+        child: AlertPushOverlay(
+          child: AppShell(
+            sidebarSections: sections,
+            selectedSidebarId: sidebarIdFor(location),
+            onSidebarSelect: go,
+            tabs: tabs,
+            selectedTabId: tabIdFor(location),
+            onTabSelect: go,
+            user: me == null
+                ? null
+                : SidebarUser(
+                    name: me.name,
+                    role: me.role.label,
+                    color: context.colors.avatarPalette.first,
+                  ),
+            onUserSettings: () => go('settings'),
+            immersive: tabIdFor(location) == 'control',
+            sidebarIconSize: prefs.sidebarIconSize.icon,
+            child: child,
+          ),
         ),
       ),
     );

@@ -44,6 +44,58 @@ class MockAlertRepository implements AlertRepository {
 
   List<Alert> get alerts => _alerts.value;
 
+  var _raised = 0;
+
+  /// 模拟服务端触发一条新告警（真实后端经 WebSocket `alert` 事件推送）。
+  String raise({
+    required String deviceId,
+    required AlertSeverity severity,
+    required String title,
+    required String metric,
+    required List<String> messages,
+    String location = '',
+  }) {
+    final id = 'live${++_raised}';
+    final now = DateTime.now();
+    _alerts.value = [
+      Alert(
+        id: id,
+        severity: severity,
+        state: AlertState.open,
+        title: title,
+        deviceId: deviceId,
+        metric: metric,
+        createdAt: now,
+        location: location,
+        events: [
+          for (final (i, m) in messages.indexed)
+            AlertEvent(
+              at: now,
+              message: m,
+              tone: i == 0
+                  ? (severity == AlertSeverity.critical
+                        ? EventTone.critical
+                        : EventTone.warning)
+                  : EventTone.neutral,
+            ),
+        ],
+      ),
+      ..._alerts.value,
+    ];
+    world.devices.addEvent(deviceId, title, EventTone.warning);
+    return id;
+  }
+
+  /// 演示用的新告警（组件预览「模拟告警推送」、调试截图）。
+  String raiseDemo() => raise(
+    deviceId: 'go2-03',
+    severity: AlertSeverity.critical,
+    title: '右后腿电机过热',
+    metric: 'RR_calf 电机温度（°C）',
+    location: 'C 区仓库',
+    messages: const ['温度 66 °C，超过阈值 60 °C 持续 10 秒', '自动执行：切换低速步态，限速 0.3 m/s'],
+  );
+
   Alert? alert(String id) => _alerts.value.where((a) => a.id == id).firstOrNull;
 
   Alert _require(String id) {
