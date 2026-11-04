@@ -15,6 +15,19 @@ cargo test --workspace            # 单元测试（不需要数据库）
 cargo fmt --all && cargo clippy --workspace --all-targets   # 提交前必须零警告
 ```
 
+## 部署
+
+开发服务器 `yaoyifeng@192.168.0.239`，服务地址 `http://192.168.0.239:8800`（systemd 服务 `uniconsole-server`，
+Postgres 17 跑在 Docker 容器 `uniconsole-db`，只监听本机）。
+
+```bash
+deploy/deploy.sh                 # 同步代码 → 服务器上 release 编译 → 重启服务
+deploy/deploy.sh <host> --setup  # 新机器首次部署（生成 .env、建数据库容器、装 systemd 服务）
+ssh yaoyifeng@192.168.0.239 journalctl -u uniconsole-server -f   # 看日志
+```
+
+服务器上的 `.env`（数据库密码、JWT 密钥、初始管理员密码）只在服务器上，不进仓库、不会被 deploy 覆盖。
+
 ## 结构（Cargo workspace）
 
 依赖方向：`domain` ← `protocol` / `auth` ← `server`。底层 crate 不得反向依赖上层。
