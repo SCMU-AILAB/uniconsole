@@ -21,6 +21,12 @@ pub struct Config {
     pub telemetry_persist_ms: u64,
     /// 等待机器人回执的超时
     pub command_timeout_ms: u64,
+    /// 邀请链接前缀，后面拼一次性令牌（前端注册了 uniconsole:// 深链）
+    pub invite_url_base: String,
+    /// 邀请链接有效期
+    pub invite_ttl_secs: i64,
+    /// 个人 API 令牌默认有效期
+    pub api_token_ttl_days: i64,
     /// 首次启动时若没有任何成员则创建管理员
     pub bootstrap_admin: Option<(String, String)>,
 }
@@ -65,6 +71,10 @@ impl Config {
             telemetry_hz: var("TELEMETRY_HZ", 10)?,
             telemetry_persist_ms: var("TELEMETRY_PERSIST_MS", 1000)?,
             command_timeout_ms: var("COMMAND_TIMEOUT_MS", 2000)?,
+            invite_url_base: env::var("INVITE_URL_BASE")
+                .unwrap_or_else(|_| "uniconsole://invite/".into()),
+            invite_ttl_secs: var("INVITE_TTL_SECS", 7 * 24 * 3600)?,
+            api_token_ttl_days: var("API_TOKEN_TTL_DAYS", 365)?,
             bootstrap_admin,
         })
     }

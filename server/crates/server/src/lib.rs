@@ -13,6 +13,7 @@ pub mod realtime;
 pub mod routes;
 pub mod services;
 pub mod state;
+pub mod util;
 
 pub use uniconsole_domain as models;
 pub use uniconsole_protocol as protocol;

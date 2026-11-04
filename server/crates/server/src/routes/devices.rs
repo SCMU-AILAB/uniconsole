@@ -131,8 +131,9 @@ pub async fn create(
     .fetch_one(&st.db)
     .await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Config,
         "注册设备",
         &row.id,
         json!({ "model": row.model }),
@@ -194,7 +195,7 @@ pub async fn remove(
     if res.rows_affected() == 0 {
         return Err(AppError::not_found("设备不存在"));
     }
-    audit::record(&st.db, &user, "删除设备", &id, json!({})).await;
+    audit::record(&st, &user, audit::Kind::Config, "删除设备", &id, json!({})).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -216,7 +217,15 @@ pub async fn rotate_token(
     if res.rows_affected() == 0 {
         return Err(AppError::not_found("设备不存在"));
     }
-    audit::record(&st.db, &user, "轮换设备令牌", &id, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        "轮换设备令牌",
+        &id,
+        json!({}),
+    )
+    .await;
     Ok(Json(json!({ "token": token })))
 }
 
@@ -337,8 +346,9 @@ pub async fn estop(
         Err(e) => return Err(e),
     };
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Config,
         if req.active {
             "单机急停"
         } else {

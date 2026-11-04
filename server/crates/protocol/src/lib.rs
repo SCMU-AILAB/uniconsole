@@ -285,6 +285,17 @@ pub enum ServerEvent {
         code: String,
         message: String,
     },
+    /// 通用失效通知：前端收到后重新 GET 对应资源。`id` 为空表示整个列表都变了。
+    Changed {
+        resource: String,
+        id: Option<String>,
+    },
+    /// 只发给某个成员的提示（控制权被收回、被分配告警等）
+    Notice {
+        member_id: Uuid,
+        level: String,
+        text: String,
+    },
     Pong {
         nonce: u64,
     },
@@ -294,6 +305,13 @@ pub enum ServerEvent {
 }
 
 impl ServerEvent {
+    pub fn changed(resource: &str, id: Option<impl ToString>) -> Self {
+        ServerEvent::Changed {
+            resource: resource.to_owned(),
+            id: id.map(|i| i.to_string()),
+        }
+    }
+
     /// 用于按订阅过滤；None 表示所有已认证客户端都应收到
     pub fn device_id(&self) -> Option<&str> {
         match self {
@@ -306,7 +324,10 @@ impl ServerEvent {
             ServerEvent::Estop { device_id, .. } | ServerEvent::Alert { device_id, .. } => {
                 device_id.as_deref()
             }
-            ServerEvent::Pong { .. } | ServerEvent::Error { .. } => None,
+            ServerEvent::Pong { .. }
+            | ServerEvent::Error { .. }
+            | ServerEvent::Changed { .. }
+            | ServerEvent::Notice { .. } => None,
         }
     }
 }

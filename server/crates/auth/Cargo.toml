@@ -11,9 +11,12 @@ uniconsole-domain.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
 chrono.workspace = true
+data-encoding.workspace = true
 hex.workspace = true
+hmac.workspace = true
 jsonwebtoken.workspace = true
 serde.workspace = true
+sha1.workspace = true
 sha2.workspace = true
 tokio = { workspace = true, features = ["rt"] }
 uuid.workspace = true

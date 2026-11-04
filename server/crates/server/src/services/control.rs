@@ -174,8 +174,9 @@ pub async fn set_global_estop(st: &AppState, user: &AuthUser, active: bool) -> A
         by: user.name.clone(),
     });
     audit::record(
-        &st.db,
+        st,
         user,
+        audit::Kind::Control,
         if active {
             "触发全局急停"
         } else {

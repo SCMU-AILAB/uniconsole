@@ -43,6 +43,8 @@ pub struct Hub {
     live: DashMap<String, LiveInfo>,
     pending: DashMap<Uuid, oneshot::Sender<Ack>>,
     estopped: DashMap<String, ()>,
+    /// 成员 id → 在线前端连接数
+    users: DashMap<Uuid, usize>,
     events: broadcast::Sender<Arc<ServerEvent>>,
 }
 
@@ -60,6 +62,7 @@ impl Hub {
             live: DashMap::new(),
             pending: DashMap::new(),
             estopped: DashMap::new(),
+            users: DashMap::new(),
             events,
         }
     }
@@ -128,6 +131,29 @@ impl Hub {
             .entry(device_id.to_owned())
             .or_default()
             .latency_ms = Some(ms);
+    }
+
+    // ───────── 前端在线状态 ─────────
+
+    pub fn user_connected(&self, member_id: Uuid) {
+        *self.users.entry(member_id).or_default() += 1;
+    }
+
+    /// 返回 true 表示该成员的最后一个连接已断开
+    pub fn user_disconnected(&self, member_id: Uuid) -> bool {
+        let mut gone = false;
+        if let Some(mut n) = self.users.get_mut(&member_id) {
+            *n = n.saturating_sub(1);
+            gone = *n == 0;
+        }
+        if gone {
+            self.users.remove_if(&member_id, |_, n| *n == 0);
+        }
+        gone
+    }
+
+    pub fn is_user_online(&self, member_id: Uuid) -> bool {
+        self.users.get(&member_id).is_some_and(|n| *n > 0)
     }
 
     // ───────── 急停标记（单机） ─────────

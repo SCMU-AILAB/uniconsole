@@ -6,7 +6,9 @@ use tokio::sync::mpsc;
 use crate::{
     config::Config,
     realtime::{Hub, TelemetrySample},
-    services::{alerting::AlertEngine, leases::LeaseService, safety::SafetyService},
+    services::{
+        alerting::AlertEngine, leases::LeaseService, safety::SafetyService, sessions::LoginLimiter,
+    },
 };
 
 /// 全局共享状态；所有字段都是廉价克隆的句柄。
@@ -19,4 +21,5 @@ pub struct AppState {
     pub safety: Arc<SafetyService>,
     pub alerts: Arc<AlertEngine>,
     pub telemetry_tx: mpsc::Sender<TelemetrySample>,
+    pub login_limiter: Arc<LoginLimiter>,
 }

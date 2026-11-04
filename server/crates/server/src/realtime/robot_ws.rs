@@ -293,6 +293,13 @@ async fn set_online(st: &AppState, device_id: &str, online: bool) {
     }
     // 断线后服务端已无法下发；停止由机器人端看门狗负责
     if !online {
-        audit::record_system(&st.db, "设备断开连接", device_id, serde_json::json!({})).await;
+        audit::record_system(
+            st,
+            audit::Kind::System,
+            "设备断开连接",
+            device_id,
+            serde_json::json!({}),
+        )
+        .await;
     }
 }

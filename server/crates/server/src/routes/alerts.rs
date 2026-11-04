@@ -225,7 +225,15 @@ pub async fn create_rule(
     .fetch_one(&st.db)
     .await?;
     reload(&st).await?;
-    audit::record(&st.db, &user, "新增告警规则", &r.name, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Alert,
+        "新增告警规则",
+        &r.name,
+        json!({}),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(r)))
 }
 
@@ -256,7 +264,15 @@ pub async fn update_rule(
     .await?
     .ok_or_else(|| AppError::not_found("规则不存在"))?;
     reload(&st).await?;
-    audit::record(&st.db, &user, "修改告警规则", &r.name, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Alert,
+        "修改告警规则",
+        &r.name,
+        json!({}),
+    )
+    .await;
     Ok(Json(r))
 }
 

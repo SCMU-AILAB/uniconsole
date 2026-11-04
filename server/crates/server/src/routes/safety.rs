@@ -43,7 +43,15 @@ pub async fn update_policies(
 ) -> AppResult<Json<Policies>> {
     user.require(Perm::EditMaps)?;
     let p = st.safety.update_policies(&st.db, patch.clone()).await?;
-    audit::record(&st.db, &user, "修改安全策略", "安全策略", patch).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        "修改安全策略",
+        "安全策略",
+        patch,
+    )
+    .await;
     Ok(Json(p))
 }
 
@@ -143,8 +151,9 @@ pub async fn create_zone(
     .fetch_one(&st.db)
     .await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Config,
         "新增电子围栏",
         &z.name,
         json!({ "type": z.zone_type }),
@@ -181,7 +190,15 @@ pub async fn update_zone(
     .fetch_optional(&st.db)
     .await?
     .ok_or_else(|| AppError::not_found("围栏不存在"))?;
-    audit::record(&st.db, &user, "修改电子围栏", &z.name, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        "修改电子围栏",
+        &z.name,
+        json!({}),
+    )
+    .await;
     Ok(Json(z))
 }
 
@@ -196,6 +213,14 @@ pub async fn delete_zone(
         .fetch_optional(&st.db)
         .await?;
     let (name,) = name.ok_or_else(|| AppError::not_found("围栏不存在"))?;
-    audit::record(&st.db, &user, "删除电子围栏", &name, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        "删除电子围栏",
+        &name,
+        json!({}),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -45,31 +45,56 @@ pub struct MemberRow {
     pub id: Uuid,
     pub handle: String,
     pub name: String,
-    pub password_hash: String,
+    /// 受邀尚未激活时为空
+    pub password_hash: Option<String>,
     pub role: Role,
     pub color: String,
     pub expires_at: Option<DateTime<Utc>>,
     pub disabled: bool,
     pub last_seen_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    pub invite_expires_at: Option<DateTime<Utc>>,
+    pub totp_secret: Option<String>,
+    pub two_factor: bool,
+    pub video_only: bool,
+    pub guest_link: bool,
 }
 
+impl MemberRow {
+    pub fn pending_invite(&self) -> bool {
+        self.password_hash.is_none()
+    }
+}
+
+/// 对外的成员视图（GET /members、/auth/me）
 #[derive(Debug, Clone, Serialize)]
 pub struct Member {
     pub id: Uuid,
+    /// 账号，不带 @（前端显示时自行加上）
     pub handle: String,
     pub name: String,
     pub role: Role,
+    /// 头像颜色 `#RRGGBB`
     pub color: String,
     pub expires_at: Option<DateTime<Utc>>,
     pub disabled: bool,
-    pub last_seen_at: Option<DateTime<Utc>>,
+    /// 已授权使用的设备（不含自己管理的设备）
+    pub granted_device_ids: Vec<String>,
+    pub video_only: bool,
+    pub guest_link: bool,
+    /// 当前是否有客户端在线（实时连接）
+    pub online: bool,
+    pub last_seen: Option<DateTime<Utc>>,
+    pub two_factor: bool,
+    /// 受邀尚未设置密码
+    pub pending_invite: bool,
     pub created_at: DateTime<Utc>,
 }
 
-impl From<MemberRow> for Member {
-    fn from(r: MemberRow) -> Self {
+impl Member {
+    pub fn from_row(r: MemberRow, granted_device_ids: Vec<String>, online: bool) -> Self {
         Self {
+            pending_invite: r.pending_invite(),
             id: r.id,
             handle: r.handle,
             name: r.name,
@@ -77,10 +102,31 @@ impl From<MemberRow> for Member {
             color: r.color,
             expires_at: r.expires_at,
             disabled: r.disabled,
-            last_seen_at: r.last_seen_at,
+            granted_device_ids,
+            video_only: r.video_only,
+            guest_link: r.guest_link,
+            online,
+            last_seen: r.last_seen_at,
+            two_factor: r.two_factor,
             created_at: r.created_at,
         }
     }
+}
+
+pg_enum!(SessionKind, "session_kind", [Login, Token]);
+
+/// 登录会话 / API 令牌（GET /me/sessions、/me/tokens）
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct SessionRow {
+    pub id: Uuid,
+    pub kind: SessionKind,
+    pub name: String,
+    pub client: String,
+    pub ip: String,
+    pub created_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
 }
 
 // ───────────── 设备 ─────────────
@@ -258,15 +304,42 @@ pub struct Zone {
     pub updated_at: DateTime<Utc>,
 }
 
+/// 审计分类（前端筛选）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditKind {
+    Control,
+    Alert,
+    Terminal,
+    Config,
+    System,
+}
+
+impl AuditKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuditKind::Control => "control",
+            AuditKind::Alert => "alert",
+            AuditKind::Terminal => "terminal",
+            AuditKind::Config => "config",
+            AuditKind::System => "system",
+        }
+    }
+}
+
+/// GET /audit 的一项。`action` 是完整的人话，前端直接显示。
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct AuditEntry {
     pub id: i64,
-    pub ts: DateTime<Utc>,
+    pub at: DateTime<Utc>,
+    /// 显示名；系统动作为「系统」
+    pub actor: String,
     pub actor_id: Option<Uuid>,
-    pub actor_name: String,
     pub action: String,
     pub target: String,
+    pub kind: String,
+    /// X-Client；系统动作为「服务端」
     pub client: String,
     pub detail: Value,
 }

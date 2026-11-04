@@ -6,19 +6,24 @@
                                           PostgreSQL
 ```
 
-- REST 前缀 `/api/v1`，JSON 字段 **snake_case**，时间为 RFC 3339（UTC）。
-- 认证：`Authorization: Bearer <jwt>`；WebSocket 可用 `?token=<jwt>`。
-- 可选请求头 `X-Client: macOS · 1.0.0`，写入审计日志的「客户端」列。
-- 错误统一为 `{"error": {"code": "...", "message": "..."}}`：
+- REST 前缀 `/api/v1`，JSON 字段 **snake_case**，时间为 RFC 3339（UTC），时长用 `*_secs` / `*_ms` 整数，百分比 0–100。
+- 认证：`Authorization: Bearer <jwt>`；WebSocket 用 `?token=<jwt>`。收到 401 时清掉令牌回到登录页。
+- 请求头 `X-Client: macOS · 1.0.0`：写入审计日志「客户端」列和「已登录设备」。值按 UTF-8 解码，失败时按
+  Latin-1（Dart `HttpClient` 发送 `·` 时就是 Latin-1），两种都可以。
+- 错误统一为 `{"error": {"code": "...", "message": "..."}}`。`message` 是给人看的中文，前端可以原样显示：
 
 | HTTP | code | 场景 |
 |---|---|---|
-| 400 | bad_request | 参数错误 |
-| 401 | unauthorized | 未登录 / 令牌无效 |
-| 403 | forbidden | 角色权限不足、没有控制权 |
+| 400 | bad_request | 参数错误（表单旁显示 message） |
+| 401 | unauthorized | 未登录 / 会话失效 / 已退出（「登录已失效，请重新登录」）；登录时账号或密码错误（「账号或密码错误」） |
+| 401 | two_factor_required | 登录：该账号开启了二次验证，请带上 `code` 重试 |
+| 401 | two_factor_invalid | 二次验证码错误 |
+| 403 | forbidden | 权限不足、没有控制权；账号已停用 / 已过期（message 分别为「账号已停用」「账号已过期」） |
 | 404 | not_found | |
-| 409 | conflict | 已存在、申请已处理、设备被他人控制 |
+| 409 | conflict | 已存在、申请已处理、设备被占用。涉及设备时带 `device_ids: [...]`，前端据此标红 |
 | 423 | estop_active | 急停中拒绝运动指令 |
+| 429 | too_many_requests | 登录失败过多（同一账号 + IP 15 分钟内 5 次，锁定 60 秒） |
+| 501 | not_implemented | 已规划、尚未实现的接口 |
 | 503 | robot_offline | 设备不在线 |
 | 504 | timeout | 等待机器人回执超时 |
 
@@ -33,23 +38,105 @@
 | formation | line · column · v · grid |
 | mission state | running · scheduled · paused |
 | zone type | ban · slow · whitelist · wall |
+| audit kind | control · alert · terminal · config · system |
 
 ---
 
 ## 1. REST
 
-### 认证与成员（Roles.dc.html）
+### 认证
+
+登录态由服务端会话管理：JWT 里只有成员 id 和会话 id。退出登录、在其他设备上踢下线、停用账号、
+修改角色都**立即生效**（下一次请求就会 401 / 403）。令牌有效期 12 小时（`expires_in`，秒）。
 
 | 方法 | 路径 | 说明 | 权限 |
 |---|---|---|---|
-| POST | /auth/login | `{handle, password}` → `{token, expires_in, member}` | 公开 |
-| GET | /auth/me | 当前成员 | 登录 |
-| GET | /members | 成员列表 | 登录 |
-| POST | /members | `{handle, name, password, role, color?, expires_at?}` | 管理员 |
-| PATCH | /members/{id} | `{name?, role?, color?, expires_at?, disabled?, password?}` | 管理员；本人可改名字/颜色/密码 |
-| DELETE | /members/{id} | | 管理员 |
-| GET / PUT | /members/{id}/devices | 授权设备 `{device_ids: []}` | 管理员 / 管理者（仅自己管理的设备） |
-| GET | /audit?limit=&before= | 审计日志（按 id 倒序分页） | 管理员 |
+| POST | /auth/login | `{handle, password, code?, device_name?}` → `LoginResponse` | 公开 |
+| POST | /auth/logout | 吊销当前会话 → 204 | 登录 |
+| GET | /auth/me | 当前成员（`Member`） | 登录 |
+| POST | /auth/password | `{old_password, new_password}` → 204；其他已登录设备全部退出 | 登录 |
+| GET | /auth/invites/{token} | 邀请页信息 `{handle, name, expires_at}`；无效或过期 404 | 公开 |
+| POST | /auth/invites/{token}/accept | `{password, device_name?}` → `LoginResponse`（设置密码并直接登录） | 公开 |
+
+```json
+// POST /auth/login
+{"handle": "@Kanade", "password": "…", "code": "123456", "device_name": "MacBook Pro"}
+// 200 LoginResponse
+{"token": "eyJ…", "expires_in": 43200, "session_id": "…", "member": Member}
+```
+
+- `handle` 可带 `@`，不区分大小写。`device_name` 显示在「已登录设备」里，缺省取 `X-Client` 的平台名。
+- **登录页要处理的错误**：
+  - 401 `unauthorized`「账号或密码错误」（账号不存在、尚未激活也返回这个，防止探测账号）
+  - 401 `two_factor_required`：显示验证码输入框，带 `code` 再提交一次
+  - 401 `two_factor_invalid`「二次验证码错误」
+  - 403 `forbidden`「账号已停用」/「账号已过期」
+  - 429 `too_many_requests`「登录失败次数过多，请 N 秒后再试」
+- 密码规则：8–128 个字符（400「密码至少 8 位」）。
+- **邀请**：管理员邀请成员时不设密码，拿到 `invite_url`（`uniconsole://invite/<token>`，7 天有效、只能用一次）。
+  前端打开深链后先 `GET /auth/invites/{token}` 显示「为 林悦（@linyue）设置密码」，再 `accept`，成功即已登录。
+
+### 当前账户（设置页）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | /me/sessions | 已登录设备 `[{id, name, detail, current, created_at, last_seen_at, expires_at}]`，`detail` 如「macOS · 1.0.0 · 192.168.1.20」 |
+| DELETE | /me/sessions/{id} | 让该设备退出登录（可以是当前会话） |
+| GET | /me/tokens | 个人 API 令牌 `[{id, name, detail, created_at, last_seen_at, expires_at}]`，`detail` 如「创建于 10 月 12 日 · 最近使用 11 月 3 日」 |
+| POST | /me/tokens | `{name, ttl_days?}` → `{id, name, token, ttl_days}`，**token 只返回这一次**；用法同登录令牌 |
+| DELETE | /me/tokens/{id} | 吊销 |
+| POST | /me/2fa/enable | → `{secret, otpauth_url}`（扫码绑定验证器 App）；已开启 409 |
+| POST | /me/2fa/verify | `{code}` → 204，验证通过后正式开启 |
+| POST | /me/2fa/disable | `{code}` → 204 |
+| GET / PUT | /me/preferences | 前端 `Preferences` 整个对象，服务端不解析，按账户同步；`two_factor` 以服务端为准（读时覆盖、写时忽略） |
+| POST | /me/push-tokens | `{platform: "apns" \| "fcm", token}` → 204（登记；服务端发送尚未接入） |
+
+开关二次验证、创建 / 吊销令牌、修改密码都会写审计。
+
+### 成员与权限（Roles.dc.html）
+
+```json
+Member = {
+  "id": "uuid", "handle": "linyue", "name": "林悦", "role": "owner",
+  "color": "#FF2D55",            // 头像颜色 #RRGGBB
+  "expires_at": null,            // null = 长期
+  "disabled": false,
+  "granted_device_ids": ["go2-01"],   // 被授权的设备（不含自己管理的，那些看 devices.owner_id）
+  "video_only": false, "guest_link": false,
+  "online": true,                // 当前有前端连接着 /api/v1/ws
+  "last_seen": "…",              // 最近一次登录 / 断开实时连接的时间
+  "two_factor": false,
+  "pending_invite": false,       // 已邀请、尚未设置密码
+  "created_at": "…"
+}
+```
+
+| 方法 | 路径 | 说明 | 权限 |
+|---|---|---|---|
+| GET | /members | `Member[]` | 登录 |
+| GET | /members/{id} | `Member` | 登录 |
+| POST | /members | `{handle, name, role, password?, color?, expires_at?, video_only?, guest_link?, device_ids?}` → 201 `{member, invite_url, invite_expires_at}`。不传 `password` 时生成邀请链接（推荐），传了则直接激活、`invite_url` 为 null | 管理员 |
+| POST | /members/{id}/invite | 重新生成邀请链接（旧链接作废）→ `{invite_url, invite_expires_at}`；已激活 409 | 管理员 |
+| PATCH | /members/{id} | `{name?, role?, color?, expires_at?, disabled?, video_only?, guest_link?}`；`expires_at: null` 表示改为长期 | 管理员；本人可改 `name` / `color` |
+| DELETE | /members/{id} | → 204 | 管理员 |
+| GET / PUT | /members/{id}/devices | 授权设备 `{device_ids: []}` | 管理员；设备管理者只能增减自己管理的设备 |
+| GET | /audit?limit=&before=&kind= | 审计日志，按 id 倒序，`before` 分页 | 管理员 |
+| GET | /audit.csv?kind= | 导出 CSV（UTF-8 BOM，Excel 可直接打开） | 管理员 |
+
+规则（与前端 mock 一致）：
+- 只有管理员能邀请、改角色、停用、移除；不能改自己的角色（403「不能修改自己的角色」），不能停用 / 移除自己。
+- 至少保留一名可用的平台管理员（409「至少要保留一名平台管理员」）。
+- 账号唯一，不区分大小写，2–32 位小写字母 / 数字 / `_.-`（409「账号 @linyue 已存在」）。
+- 停用会立即踢下线该成员的所有会话。
+
+`AuditEntry`：
+
+```json
+{"id": 123, "at": "…", "actor": "Kanade", "actor_id": "uuid | null", "action": "批准 林悦 的控制权申请（Alpha）",
+ "target": "Alpha", "kind": "control", "client": "macOS · 1.0.0", "detail": {}}
+```
+
+`action` 是完整的人话，前端直接显示；系统动作 `actor` 为「系统」、`client` 为「服务端」。新条目推送 `changed: audit`。
 
 ### 设备（Main / Control / Sensors / Maintenance）
 
@@ -171,9 +258,18 @@
 {"type": "estop", "device_id": null | "go2-01", "active": true, "by": "Kanade"}
 {"type": "alert", "alert_id": "…", "device_id": "…", "severity": "critical", "title": "电机过热", "state": "open"}
 {"type": "robot_event", "device_id": "…", "level": "warning", "code": "fall", "message": "…"}
+{"type": "changed", "resource": "members", "id": "… | null"}   // 通用失效通知：重新 GET 对应资源，见下表
+{"type": "notice", "member_id": "…", "level": "info|warning", "text": "Kanade 收回了你对 Alpha 的控制权：…"}  // 只发给本人
 {"type": "pong", "nonce": 1}
 {"type": "error", "message": "你没有该设备的控制权（只读）"}
 ```
+
+`changed.resource` 取值（`id` 为空表示整个列表都变了）：
+
+| resource | 重新拉取 |
+|---|---|
+| `members` | `GET /members`（也用于成员上线 / 下线） |
+| `audit` | `GET /audit` |
 
 ---
 

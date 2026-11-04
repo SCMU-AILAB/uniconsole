@@ -89,7 +89,7 @@ pub async fn acquire(
         AcquireOutcome::Granted { .. } => "获取控制权",
         AcquireOutcome::Queued { .. } => "申请控制权",
     };
-    audit::record(&st.db, &user, action, &id, json!({})).await;
+    audit::record(&st, &user, audit::Kind::Control, action, &id, json!({})).await;
     Ok(Json(out))
 }
 
@@ -119,8 +119,9 @@ pub async fn release(
     }
     st.leases.release(&user, &id, q.force).await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Control,
         if q.force {
             "强制收回控制权"
         } else {
@@ -141,8 +142,9 @@ pub async fn transfer(
 ) -> AppResult<Json<Lease>> {
     let lease = st.leases.transfer(&user, &id, target).await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Control,
         "转移控制权",
         &id,
         json!({ "to": lease.holder_id.or(lease.task_id) }),
@@ -167,8 +169,9 @@ pub async fn approve(
 ) -> AppResult<Json<Lease>> {
     let lease = st.leases.approve(&user, id).await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Control,
         "批准控制权申请",
         &lease.device_id,
         json!({ "request_id": id }),
@@ -184,8 +187,9 @@ pub async fn deny(
 ) -> AppResult<Json<LeaseRequest>> {
     let req = st.leases.deny(&user, id).await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Control,
         "拒绝控制权申请",
         &req.device_id,
         json!({ "request_id": id }),

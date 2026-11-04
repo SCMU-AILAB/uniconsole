@@ -6,6 +6,7 @@ mod auth;
 mod devices;
 mod fleet;
 mod leases;
+mod me;
 mod members;
 mod missions;
 mod safety;
@@ -13,7 +14,7 @@ mod safety;
 use axum::{
     Json, Router,
     extract::State,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
 };
 use serde_json::{Value, json};
 
@@ -27,19 +28,41 @@ pub fn router(state: AppState) -> Router {
     let api = Router::new()
         // 系统
         .route("/system/info", get(system_info))
-        // 认证与成员（Roles.dc.html）
+        // 认证
         .route("/auth/login", post(auth::login))
+        .route("/auth/logout", post(auth::logout))
         .route("/auth/me", get(auth::me))
+        .route("/auth/password", post(auth::change_password))
+        .route("/auth/invites/{token}", get(auth::invite_info))
+        .route("/auth/invites/{token}/accept", post(auth::accept_invite))
+        // 当前账户（设置页）
+        .route("/me/sessions", get(me::list_sessions))
+        .route("/me/sessions/{id}", delete(me::revoke_session))
+        .route("/me/tokens", get(me::list_tokens).post(me::create_token))
+        .route("/me/tokens/{id}", delete(me::revoke_token))
+        .route("/me/2fa/enable", post(me::enable_2fa))
+        .route("/me/2fa/verify", post(me::verify_2fa))
+        .route("/me/2fa/disable", post(me::disable_2fa))
+        .route(
+            "/me/preferences",
+            get(me::get_preferences).put(me::put_preferences),
+        )
+        .route("/me/push-tokens", post(me::add_push_token))
+        // 成员与权限（Roles.dc.html）
         .route("/members", get(members::list).post(members::create))
         .route(
             "/members/{id}",
-            patch(members::update).delete(members::remove),
+            get(members::get)
+                .patch(members::update)
+                .delete(members::remove),
         )
+        .route("/members/{id}/invite", post(members::reinvite))
         .route(
             "/members/{id}/devices",
-            get(members::grants).put(members::set_grants),
+            get(members::grants).put(members::put_grants),
         )
         .route("/audit", get(members::audit))
+        .route("/audit.csv", get(members::audit_csv))
         // 设备（Main / Control / Sensors / Maintenance）
         .route("/devices", get(devices::list).post(devices::create))
         .route(

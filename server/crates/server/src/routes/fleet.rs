@@ -176,8 +176,9 @@ pub async fn start(
     .fetch_one(&st.db)
     .await?;
     audit::record(
-        &st.db,
+        &st,
         &user,
+        audit::Kind::Control,
         "开始联调会话",
         &s.name,
         json!({ "devices": s.device_ids }),
@@ -207,7 +208,15 @@ pub async fn stop(
     .bind(id)
     .fetch_one(&st.db)
     .await?;
-    audit::record(&st.db, &user, "结束联调会话", &s.name, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Control,
+        "结束联调会话",
+        &s.name,
+        json!({}),
+    )
+    .await;
     Ok(Json(s))
 }
 

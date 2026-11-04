@@ -7,40 +7,69 @@ use serde_json::json;
 
 pub type AppResult<T> = Result<T, AppError>;
 
-/// 统一错误：响应体 `{"error": {"code": "...", "message": "..."}}`
+/// 统一错误：响应体 `{"error": {"code": "...", "message": "..."}}`。
+/// `message` 会被前端原样显示，必须是给人看的中文。
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("{0}")]
     BadRequest(String),
-    #[error("未登录或令牌无效")]
+    #[error("登录已失效，请重新登录")]
     Unauthorized,
+    #[error("账号或密码错误")]
+    BadCredentials,
+    #[error("请输入二次验证码")]
+    TwoFactorRequired,
+    #[error("二次验证码错误")]
+    TwoFactorInvalid,
     #[error("{0}")]
     Forbidden(String),
     #[error("{0}")]
     NotFound(String),
     #[error("{0}")]
     Conflict(String),
+    /// 409，并带上冲突的设备，前端据此标红
+    #[error("{message}")]
+    ConflictDevices {
+        message: String,
+        device_ids: Vec<String>,
+    },
+    #[error("{0}")]
+    TooManyRequests(String),
     #[error("设备 {0} 不在线")]
     RobotOffline(String),
     #[error("等待设备回执超时")]
     Timeout,
     #[error("系统处于急停状态")]
     EstopActive,
+    #[error("{0}")]
+    NotImplemented(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
 
 impl AppError {
+    pub fn code(&self) -> &'static str {
+        self.status_and_code().1
+    }
+
     fn status_and_code(&self) -> (StatusCode, &'static str) {
         match self {
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
+            AppError::Unauthorized | AppError::BadCredentials => {
+                (StatusCode::UNAUTHORIZED, "unauthorized")
+            }
+            AppError::TwoFactorRequired => (StatusCode::UNAUTHORIZED, "two_factor_required"),
+            AppError::TwoFactorInvalid => (StatusCode::UNAUTHORIZED, "two_factor_invalid"),
             AppError::Forbidden(_) => (StatusCode::FORBIDDEN, "forbidden"),
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
-            AppError::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
+            AppError::Conflict(_) | AppError::ConflictDevices { .. } => {
+                (StatusCode::CONFLICT, "conflict")
+            }
+            AppError::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, "too_many_requests"),
             AppError::RobotOffline(_) => (StatusCode::SERVICE_UNAVAILABLE, "robot_offline"),
             AppError::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout"),
             AppError::EstopActive => (StatusCode::LOCKED, "estop_active"),
+            AppError::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         }
     }
@@ -56,6 +85,9 @@ impl AppError {
     }
     pub fn conflict(msg: impl Into<String>) -> Self {
         AppError::Conflict(msg.into())
+    }
+    pub fn not_implemented(what: &str) -> Self {
+        AppError::NotImplemented(format!("{what}尚未实现"))
     }
 }
 
@@ -84,10 +116,10 @@ impl IntoResponse for AppError {
             }
             other => other.to_string(),
         };
-        (
-            status,
-            Json(json!({ "error": { "code": code, "message": message } })),
-        )
-            .into_response()
+        let mut body = json!({ "error": { "code": code, "message": message } });
+        if let AppError::ConflictDevices { device_ids, .. } = &self {
+            body["error"]["device_ids"] = json!(device_ids);
+        }
+        (status, Json(body)).into_response()
     }
 }

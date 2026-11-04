@@ -27,6 +27,7 @@ use crate::{
         control::{self, Actor},
         leases::LeaseService,
         safety::SafetyService,
+        sessions::LoginLimiter,
     },
     state::AppState,
 };
@@ -58,6 +59,7 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
         safety: Arc::new(SafetyService::load(&db).await?),
         alerts: Arc::new(AlertEngine::load(&db).await?),
         telemetry_tx: spawn_telemetry_writer(db.clone()),
+        login_limiter: Arc::new(LoginLimiter::default()),
         hub,
         cfg,
         db,
@@ -80,9 +82,12 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(cfg.bind_addr).await?;
     tracing::info!("UniConsole 服务已启动：http://{}", cfg.bind_addr);
-    axum::serve(listener, app(state))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        app(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 
@@ -161,7 +166,8 @@ async fn lease_sweeper(st: AppState) {
                 .await;
             }
             audit::record_system(
-                &st.db,
+                &st,
+                audit::Kind::System,
                 "控制权过期释放",
                 &lease.device_id,
                 json!({ "holder": lease.holder_id }),

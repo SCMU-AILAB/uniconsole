@@ -76,7 +76,15 @@ pub async fn create(
     .bind(user.id)
     .fetch_one(&st.db)
     .await?;
-    audit::record(&st.db, &user, "创建任务", &m.name, json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        "创建任务",
+        &m.name,
+        json!({}),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(m)))
 }
 
@@ -119,6 +127,14 @@ pub async fn remove(
     if res.rows_affected() == 0 {
         return Err(AppError::not_found("任务不存在"));
     }
-    audit::record(&st.db, &user, "删除任务", &id.to_string(), json!({})).await;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        "删除任务",
+        &id.to_string(),
+        json!({}),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }

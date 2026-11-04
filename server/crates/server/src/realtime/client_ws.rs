@@ -54,6 +54,9 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
     let can_see = |id: &str| visible.as_ref().is_none_or(|v| v.contains(id));
 
     tracing::debug!(user = %user.name, "前端已连接");
+    st.hub.user_connected(user.id);
+    st.hub
+        .publish(ServerEvent::changed("members", Some(user.id)));
 
     loop {
         tokio::select! {
@@ -79,9 +82,10 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                     }
                     Err(RecvError::Closed) => break,
                 };
-                let deliver = match ev.device_id() {
-                    None => true,
-                    Some(id) => can_see(id) && match &subs {
+                let deliver = match (&*ev, ev.device_id()) {
+                    (ServerEvent::Notice { member_id, .. }, _) => *member_id == user.id,
+                    (_, None) => true,
+                    (_, Some(id)) => can_see(id) && match &subs {
                         Subs::All => true,
                         Subs::Some(set) => set.contains(id),
                     },
@@ -105,6 +109,14 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
         {
             tracing::debug!(device = %id, error = %e, "断线保护停止失败");
         }
+    }
+    if st.hub.user_disconnected(user.id) {
+        let _ = sqlx::query("UPDATE members SET last_seen_at = now() WHERE id = $1")
+            .bind(user.id)
+            .execute(&st.db)
+            .await;
+        st.hub
+            .publish(ServerEvent::changed("members", Some(user.id)));
     }
     tracing::debug!(user = %user.name, "前端已断开");
 }
