@@ -77,17 +77,23 @@ class Device {
   final int? maxMotorTemp;
   final Duration? uptime;
 
-  Device copyWith({String? firmware, Duration? uptime}) => Device(
+  Device copyWith({
+    String? firmware,
+    Duration? uptime,
+    DeviceStatus? status,
+    String? location,
+    String? currentTask,
+  }) => Device(
     id: id,
     name: name,
     code: code,
     model: model,
     kind: kind,
-    status: status,
+    status: status ?? this.status,
     battery: battery,
     latencyMs: latencyMs,
-    location: location,
-    currentTask: currentTask,
+    location: location ?? this.location,
+    currentTask: currentTask ?? this.currentTask,
     groupId: groupId,
     ownerId: ownerId,
     userId: userId,

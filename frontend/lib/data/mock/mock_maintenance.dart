@@ -162,6 +162,10 @@ class MockMaintenanceRepository implements MaintenanceRepository {
         ready.add(id);
       }
     }
+    if (ready.isNotEmpty || deviceIds.isNotEmpty) {
+      final names = deviceIds.map(world.deviceName).join('、');
+      world.log('批量升级固件：$names', kind: AuditKind.terminal);
+    }
     final upgrading = firmware.any((f) => f.state == FirmwareState.upgrading);
     for (final (i, id) in ready.indexed) {
       // 没有设备在升级时，第一台作为灰度先行，其余排队。
@@ -198,6 +202,11 @@ class MockMaintenanceRepository implements MaintenanceRepository {
     final f = status(deviceId);
     if (f == null) return;
     _log(deviceId, LogSeverity.warn, 'ota: rollback to previous partition');
+    world.log(
+      '将 ${world.deviceName(deviceId)} 固件回滚到上一版本',
+      kind: AuditKind.terminal,
+      target: deviceId,
+    );
     _set(
       deviceId,
       (x) => x.copyWith(state: FirmwareState.available, progress: 0),
@@ -217,6 +226,11 @@ class MockMaintenanceRepository implements MaintenanceRepository {
       '${world.me.name} 远程重启',
       EventTone.neutral,
     );
+    world.log(
+      '远程重启 ${world.deviceName(deviceId)}',
+      kind: AuditKind.terminal,
+      target: deviceId,
+    );
   }
 
   @override
@@ -228,9 +242,13 @@ class MockMaintenanceRepository implements MaintenanceRepository {
   @override
   Stream<MaintenanceWindow> watchWindow() => _window.watch();
 
+  /// 已打开过终端的设备（每台只记一次审计）。
+  final _terminals = <String>{};
+
   @override
   Future<void> setWindow(MaintenanceWindow window) async {
     _window.value = window;
+    world.log('修改维护窗口为每天 ${window.label}');
   }
 
   @override
@@ -250,6 +268,13 @@ class MockMaintenanceRepository implements MaintenanceRepository {
       return const [
         TerminalLine('ssh: connect: Host is down', tone: TerminalTone.error),
       ];
+    }
+    if (_terminals.add(deviceId)) {
+      world.log(
+        '打开 ${d.name} 远程终端',
+        kind: AuditKind.terminal,
+        target: deviceId,
+      );
     }
     final f = status(deviceId);
     final cmd = command.trim();

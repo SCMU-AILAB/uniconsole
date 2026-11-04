@@ -1,33 +1,62 @@
 import 'dart:ui' show Offset, Rect;
 
 import '../models/models.dart';
+import 'mock_seed.dart';
 
 /// 示例数据，取自 design/*.dc.html 的 renderVals()。
 /// 设计稿里的「现在」是 11 月 2 日 14:32。
 abstract final class MockData {
   static final now = DateTime(2026, 11, 2, 14, 32);
 
-  static const members = [
-    Member(
+  // Roles.dc.html M[]。周明管理 Echo、Foxtrot（与设备 ownerId 一致），所以是设备管理者。
+  static final members = [
+    const Member(
       id: 'kanade',
       name: 'Kanade',
       handle: '@kanade',
       role: MemberRole.admin,
       color: 0xFF5856D6,
+      online: true,
     ),
-    Member(
+    const Member(
       id: 'linyue',
       name: '林悦',
       handle: '@linyue',
       role: MemberRole.owner,
       color: 0xFFFF2D55,
+      grantedDeviceIds: ['go2-01'],
+      online: true,
     ),
-    Member(
+    const Member(
       id: 'zhouming',
       name: '周明',
       handle: '@zhouming',
-      role: MemberRole.user,
+      role: MemberRole.owner,
       color: 0xFF248A3D,
+      grantedDeviceIds: ['go2-03'],
+      online: true,
+    ),
+    Member(
+      id: 'chenyi',
+      name: '陈一',
+      handle: '@chenyi',
+      role: MemberRole.user,
+      color: 0xFFFF9500,
+      grantedDeviceIds: const ['go2-01', 'go2-02', 'go2-04'],
+      expiresAt: DateTime(2026, 11, 30, 23, 59),
+      lastSeen: MockSeed.ago(const Duration(hours: 3)),
+    ),
+    Member(
+      id: 'guest-hall',
+      name: '展厅访客',
+      handle: '临时链接',
+      role: MemberRole.viewer,
+      color: 0xFF8E8E93,
+      grantedDeviceIds: const ['g1-01', 'go2-04'],
+      videoOnly: true,
+      guestLink: true,
+      expiresAt: MockSeed.rebase(DateTime(2026, 11, 2, 18)),
+      lastSeen: MockSeed.ago(const Duration(hours: 5, minutes: 50)),
     ),
   ];
 

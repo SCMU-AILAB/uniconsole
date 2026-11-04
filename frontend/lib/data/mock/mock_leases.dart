@@ -137,6 +137,11 @@ class MockLeaseRepository implements LeaseRepository {
         ],
       ),
     );
+    world.log(
+      '申请 ${world.deviceName(deviceId)} 的控制权',
+      kind: AuditKind.control,
+      target: deviceId,
+    );
     return LeaseRequestResult.queued;
   }
 
@@ -166,6 +171,11 @@ class MockLeaseRepository implements LeaseRepository {
       deviceId,
       '${world.me.name} 强制收回 ${holderName(l)} 的控制权：$reason',
       EventTone.warning,
+    );
+    world.log(
+      '强制收回 ${holderName(l)} 对 ${world.deviceName(deviceId)} 的控制权：$reason',
+      kind: AuditKind.control,
+      target: deviceId,
     );
   }
 
@@ -201,6 +211,11 @@ class MockLeaseRepository implements LeaseRepository {
       deviceId,
       '控制权由 $from 转移给 $to${note == null || note.isEmpty ? '' : '：$note'}',
     );
+    world.log(
+      '将 ${world.deviceName(deviceId)} 的控制权由 $from 转移给 $to',
+      kind: AuditKind.control,
+      target: deviceId,
+    );
   }
 
   @override
@@ -219,6 +234,11 @@ class MockLeaseRepository implements LeaseRepository {
     _event(
       deviceId,
       '${world.me.name} 批准 ${world.nameOf(r.userId)} 的申请，控制权已转移',
+    );
+    world.log(
+      '批准了 ${world.nameOf(r.userId)} 对 ${world.deviceName(deviceId)} 的控制权申请',
+      kind: AuditKind.control,
+      target: deviceId,
     );
   }
 
@@ -243,6 +263,11 @@ class MockLeaseRepository implements LeaseRepository {
       ),
     );
     _event(deviceId, '${world.me.name} 拒绝 ${world.nameOf(r.userId)} 的控制权申请');
+    world.log(
+      '拒绝了 ${world.nameOf(r.userId)} 对 ${world.deviceName(deviceId)} 的控制权申请',
+      kind: AuditKind.control,
+      target: deviceId,
+    );
   }
 
   // ---- 联调会话 ----

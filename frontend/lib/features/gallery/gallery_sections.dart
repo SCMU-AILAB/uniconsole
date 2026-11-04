@@ -1659,7 +1659,7 @@ class _TableSectionState extends State<TableSection> {
       (
         '林悦',
         '@linyue · 10 分钟前',
-        '设备所有者',
+        '设备管理者',
         StatusTone.busy,
         'Charlie、Delta',
         '长期',

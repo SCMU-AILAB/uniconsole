@@ -4,22 +4,28 @@ import 'dart:ui' show Offset;
 
 import '../models/models.dart';
 import '../repositories/repositories.dart';
+import 'mock_agent.dart';
 import 'mock_alerts.dart';
 import 'mock_data.dart';
 import 'mock_fleet.dart';
 import 'mock_leases.dart';
 import 'mock_maintenance.dart';
+import 'mock_members.dart';
 import 'mock_missions.dart';
+import 'mock_preferences.dart';
 import 'mock_recordings.dart';
 import 'mock_safety.dart';
 import 'mock_seed.dart';
 import 'mock_store.dart';
 
+export 'mock_agent.dart';
 export 'mock_alerts.dart';
 export 'mock_fleet.dart';
 export 'mock_leases.dart';
 export 'mock_maintenance.dart';
+export 'mock_members.dart';
 export 'mock_missions.dart';
+export 'mock_preferences.dart';
 export 'mock_recordings.dart';
 export 'mock_safety.dart';
 
@@ -27,6 +33,7 @@ export 'mock_safety.dart';
 /// 控制权 ↔ 联调会话 ↔ 全局急停）。
 class MockWorld {
   MockWorld({this.telemetryHz = 10, this.currentUserId = 'kanade'}) {
+    members = MockMemberRepository(world: this);
     devices = MockDeviceRepository();
     leases = MockLeaseRepository(world: this);
     fleet = MockRobotFleet(world: this);
@@ -35,6 +42,9 @@ class MockWorld {
     alerts = MockAlertRepository(world: this);
     missions = MockMissionRepository(world: this);
     maintenance = MockMaintenanceRepository(world: this);
+    agent = MockAgentRepository(world: this);
+    intercom = MockIntercomRepository(world: this);
+    preferences = MockPreferencesRepository(world: this);
   }
 
   final int telemetryHz;
@@ -47,19 +57,33 @@ class MockWorld {
   late final MockAlertRepository alerts;
   late final MockMissionRepository missions;
   late final MockMaintenanceRepository maintenance;
+  late final MockMemberRepository members;
+  late final MockAgentRepository agent;
+  late final MockIntercomRepository intercom;
+  late final MockPreferencesRepository preferences;
   final recordings = MockRecordingRepository();
-  final members = MockMemberRepository();
 
-  Member get me => MockData.members.firstWhere((m) => m.id == currentUserId);
+  Member get me => members.member(currentUserId)!;
 
-  String nameOf(String userId) =>
-      MockData.members.where((m) => m.id == userId).firstOrNull?.name ?? userId;
+  String nameOf(String userId) => members.member(userId)?.name ?? userId;
+
+  String deviceName(String deviceId) =>
+      devices.device(deviceId)?.name ?? deviceId;
+
+  /// 以当前用户身份写一条审计日志（见 [MockMemberRepository.log]）。
+  void log(
+    String action, {
+    AuditKind kind = AuditKind.config,
+    String? actorId,
+    String? target,
+  }) => members.log(action, kind: kind, actorId: actorId, target: target);
 
   /// 停止 mock 内部的定时器（租约到期检查、固件升级进度、建图）。
   void dispose() {
     leases.dispose();
     missions.dispose();
     maintenance.dispose();
+    agent.dispose();
   }
 }
 
@@ -79,6 +103,8 @@ class MockDeviceRepository implements DeviceRepository {
           ),
       ]),
   };
+
+  List<Device> get all => _devices.value;
 
   Device? device(String id) =>
       _devices.value.where((d) => d.id == id).firstOrNull;
@@ -110,16 +136,6 @@ class MockDeviceRepository implements DeviceRepository {
   @override
   Stream<List<DeviceEvent>> watchEvents(String deviceId) =>
       _events[deviceId]?.watch() ?? Stream.value(const []);
-}
-
-class MockMemberRepository implements MemberRepository {
-  final _members = MockStore<List<Member>>(MockData.members);
-
-  @override
-  Stream<List<Member>> watchMembers() => _members.watch();
-
-  @override
-  Stream<Member> watchCurrentUser() => _members.watch().map((m) => m.first);
 }
 
 /// 模拟的机器人：按 [MockWorld.telemetryHz] 推送遥测，响应移动 / 模式 / 急停指令。

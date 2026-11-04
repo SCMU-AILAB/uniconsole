@@ -1,3 +1,4 @@
+export 'agent.dart';
 export 'alert.dart';
 export 'command.dart';
 export 'device.dart';
@@ -6,6 +7,7 @@ export 'lease.dart';
 export 'maintenance.dart';
 export 'member.dart';
 export 'mission.dart';
+export 'preferences.dart';
 export 'recording.dart';
 export 'safety.dart';
 export 'telemetry.dart';

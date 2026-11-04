@@ -32,7 +32,7 @@ void main() {
     });
 
     test('强制收回只允许设备管理者和平台管理员', () async {
-      final user = MockWorld(currentUserId: 'zhouming');
+      final user = MockWorld(currentUserId: 'chenyi');
       addTearDown(user.dispose);
       await expectLater(
         user.leases.forceRelease('go2-01', reason: '测试'),
@@ -140,12 +140,12 @@ void main() {
 
   group('安全策略', () {
     test('全局急停：所有在线设备急停、会话暂停；解除按策略需要管理者', () async {
-      final user = MockWorld(currentUserId: 'zhouming');
+      final user = MockWorld(currentUserId: 'chenyi');
       addTearDown(user.dispose);
       // 任何人都能触发。
       await user.safety.setGlobalEstop(active: true);
       expect(user.safety.state.globalEstop, isTrue);
-      expect(user.safety.state.estopBy, '周明');
+      expect(user.safety.state.estopBy, '陈一');
       for (final id in [
         'go2-01',
         'go2-02',

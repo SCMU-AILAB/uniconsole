@@ -24,6 +24,8 @@ class MockMissionRepository implements MissionRepository {
   var _seq = 1;
   Timer? _remap;
 
+  List<Mission> get missions => _missions.value;
+
   Mission? mission(String id) =>
       _missions.value.where((m) => m.id == id).firstOrNull;
 

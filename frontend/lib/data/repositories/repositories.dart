@@ -266,9 +266,102 @@ abstract interface class SafetyRepository {
   Future<void> deleteZone(String id);
 }
 
+/// 成员与权限（API §1 认证与成员）。违反规则时抛 [MemberException]。
 abstract interface class MemberRepository {
+  /// `GET /members`。
   Stream<List<Member>> watchMembers();
 
-  /// 当前登录的成员。
+  /// 当前登录的成员（`GET /auth/me`）。
   Stream<Member> watchCurrentUser();
+
+  /// `POST /members`（管理员）→ 新成员 id。
+  Future<String> invite(MemberDraft draft);
+
+  /// `PATCH /members/{id}` + `PUT /members/{id}/devices`。
+  Future<void> update(
+    String id, {
+    MemberRole? role,
+    DateTime? expiresAt,
+    bool clearExpiry = false,
+    List<String>? grantedDeviceIds,
+    bool? videoOnly,
+    bool? disabled,
+  });
+
+  /// `DELETE /members/{id}`。
+  Future<void> remove(String id);
+
+  /// `GET /audit`，按时间倒序。
+  Stream<List<AuditEntry>> watchAudit();
+
+  /// 导出审计日志 CSV → 文件名。
+  Future<String> exportAudit();
+}
+
+class MemberException implements Exception {
+  const MemberException(this.code, this.message);
+
+  /// API 错误码：forbidden、conflict、bad_request。
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// 智能体（Agent.dc.html）。服务端接口尚未定义，先按界面需要抽象：
+/// 用户发送自然语言 → 智能体回复文字或执行计划；计划需确认后才执行（HANDOFF §8.3）。
+abstract interface class AgentRepository {
+  /// 当前对话。
+  Stream<Conversation> watchConversation();
+
+  /// 历史对话（不含消息正文以外的状态）。
+  Stream<List<Conversation>> watchHistory();
+
+  Future<void> openConversation(String id);
+  Future<void> newConversation();
+
+  Future<void> send(String text);
+
+  /// 输入框上方的 @设备 / 地图标签。
+  Future<void> setContext({List<String>? deviceIds, String? mapId});
+
+  /// 确认执行计划。
+  Future<void> runPlan(String planId);
+
+  /// 中止计划并停止计划内的所有设备。
+  Future<void> abortPlan(String planId);
+
+  /// 放弃等待确认的计划。
+  Future<void> cancelPlan(String planId);
+
+  Stream<List<AgentSkill>> watchSkills();
+  Future<void> setSkillMode(String name, SkillMode mode);
+}
+
+/// 实时对讲与文字转语音播报。
+abstract interface class IntercomRepository {
+  Stream<List<IntercomTarget>> watchTargets();
+  Stream<IntercomState> watchState();
+  Future<void> setTarget(String targetId);
+
+  /// 按住说话：开始 / 结束上行音频。
+  Future<void> startTalking();
+  Future<void> stopTalking();
+  Future<void> setListening(bool listening);
+
+  /// 播报到当前对象，返回实际播放的设备数。
+  Future<int> broadcast(String text);
+}
+
+/// 账户偏好与客户端信息（设置页）。
+abstract interface class PreferencesRepository {
+  Stream<Preferences> watchPreferences();
+  Future<void> update(Preferences Function(Preferences) change);
+
+  Stream<GamepadInfo?> watchGamepad();
+  Stream<List<SignedInClient>> watchClients();
+  Future<void> signOut(String clientId);
+  Stream<List<ApiToken>> watchTokens();
+  Future<void> revokeToken(String id);
 }

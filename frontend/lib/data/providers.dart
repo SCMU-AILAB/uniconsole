@@ -51,6 +51,15 @@ final recordingRepositoryProvider = Provider<RecordingRepository>(
 final maintenanceRepositoryProvider = Provider<MaintenanceRepository>(
   (ref) => ref.watch(mockWorldProvider).maintenance,
 );
+final agentRepositoryProvider = Provider<AgentRepository>(
+  (ref) => ref.watch(mockWorldProvider).agent,
+);
+final intercomRepositoryProvider = Provider<IntercomRepository>(
+  (ref) => ref.watch(mockWorldProvider).intercom,
+);
+final preferencesRepositoryProvider = Provider<PreferencesRepository>(
+  (ref) => ref.watch(mockWorldProvider).preferences,
+);
 
 // ---- 数据流 ----
 
@@ -126,6 +135,79 @@ final membersProvider = StreamProvider<List<Member>>(
 final currentUserProvider = StreamProvider<Member>(
   (ref) => ref.watch(memberRepositoryProvider).watchCurrentUser(),
 );
+final auditProvider = StreamProvider<List<AuditEntry>>(
+  (ref) => ref.watch(memberRepositoryProvider).watchAudit(),
+);
+final conversationProvider = StreamProvider<Conversation>(
+  (ref) => ref.watch(agentRepositoryProvider).watchConversation(),
+);
+final conversationHistoryProvider = StreamProvider<List<Conversation>>(
+  (ref) => ref.watch(agentRepositoryProvider).watchHistory(),
+);
+final agentSkillsProvider = StreamProvider<List<AgentSkill>>(
+  (ref) => ref.watch(agentRepositoryProvider).watchSkills(),
+);
+final intercomTargetsProvider = StreamProvider<List<IntercomTarget>>(
+  (ref) => ref.watch(intercomRepositoryProvider).watchTargets(),
+);
+final intercomStateProvider = StreamProvider<IntercomState>(
+  (ref) => ref.watch(intercomRepositoryProvider).watchState(),
+);
+final preferencesStreamProvider = StreamProvider<Preferences>(
+  (ref) => ref.watch(preferencesRepositoryProvider).watchPreferences(),
+);
+
+/// 当前偏好；加载前用默认值，界面不必处理加载态。
+final preferencesProvider = Provider<Preferences>(
+  (ref) => ref.watch(preferencesStreamProvider).value ?? const Preferences(),
+);
+final gamepadProvider = StreamProvider<GamepadInfo?>(
+  (ref) => ref.watch(preferencesRepositoryProvider).watchGamepad(),
+);
+final signedInClientsProvider = StreamProvider<List<SignedInClient>>(
+  (ref) => ref.watch(preferencesRepositoryProvider).watchClients(),
+);
+final apiTokensProvider = StreamProvider<List<ApiToken>>(
+  (ref) => ref.watch(preferencesRepositoryProvider).watchTokens(),
+);
+
+/// 成员可访问的设备（Roles.dc.html「可访问设备」列）：
+/// 自己管理的（Device.ownerId）+ 额外授权的；平台管理员为全部。
+final memberDevicesProvider = Provider.family<MemberDevices, String>((ref, id) {
+  final devices = ref.watch(devicesProvider).value ?? const <Device>[];
+  final m = ref
+      .watch(membersProvider)
+      .value
+      ?.where((m) => m.id == id)
+      .firstOrNull;
+  if (m == null) return const MemberDevices();
+  if (m.role == MemberRole.admin) {
+    return MemberDevices(all: true, granted: [for (final d in devices) d]);
+  }
+  final managed = [
+    for (final d in devices)
+      if (d.ownerId == id) d,
+  ];
+  final granted = [
+    for (final d in devices)
+      if (m.grantedDeviceIds.contains(d.id) && d.ownerId != id) d,
+  ];
+  return MemberDevices(managed: managed, granted: granted);
+});
+
+class MemberDevices {
+  const MemberDevices({
+    this.all = false,
+    this.managed = const [],
+    this.granted = const [],
+  });
+
+  final bool all;
+  final List<Device> managed;
+  final List<Device> granted;
+
+  int get count => all ? granted.length : managed.length + granted.length;
+}
 
 /// 单台设备。
 final deviceProvider = Provider.family<Device?, String>(

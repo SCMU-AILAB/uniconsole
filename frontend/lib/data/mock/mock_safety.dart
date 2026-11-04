@@ -58,11 +58,16 @@ class MockSafetyRepository implements SafetyRepository {
       lastDrillAt: state.lastDrillAt,
       policies: state.policies,
     );
+    world.log(
+      active ? '触发全局急停（${online.length} 台设备）' : '解除全局急停',
+      kind: AuditKind.control,
+    );
   }
 
   @override
   Future<void> updatePolicies(SafetyPolicies policies) async {
     _state.value = state.copyWith(policies: policies);
+    world.log('修改安全策略');
   }
 
   @override
@@ -132,16 +137,26 @@ class MockSafetyRepository implements SafetyRepository {
       },
     );
     _zones.value = [..._zones.value, zone];
+    world.log('新建围栏「${zone.name}」（${zone.rule}）', target: id);
     return id;
   }
 
   @override
   Future<void> updateZone(Zone zone) async {
+    final old = _zones.value.where((z) => z.id == zone.id).firstOrNull;
     _zones.value = [for (final z in _zones.value) z.id == zone.id ? zone : z];
+    // 拖动边界不记审计，改规则 / 改名才记。
+    if (old != null && old.rule != zone.rule) {
+      world.log('修改围栏「${zone.name}」为${zone.rule}', target: zone.id);
+    } else if (old != null && old.name != zone.name) {
+      world.log('将围栏「${old.name}」重命名为「${zone.name}」', target: zone.id);
+    }
   }
 
   @override
   Future<void> deleteZone(String id) async {
+    final old = _zones.value.where((z) => z.id == id).firstOrNull;
+    if (old != null) world.log('删除围栏「${old.name}」', target: id);
     _zones.value = [
       for (final z in _zones.value)
         if (z.id != id) z,

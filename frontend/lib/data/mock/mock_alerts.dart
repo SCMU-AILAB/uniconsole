@@ -42,6 +42,8 @@ class MockAlertRepository implements AlertRepository {
   final _roster = MockStore(MockOpsData.roster);
   var _ruleSeq = 1;
 
+  List<Alert> get alerts => _alerts.value;
+
   Alert? alert(String id) => _alerts.value.where((a) => a.id == id).firstOrNull;
 
   Alert _require(String id) {
@@ -93,6 +95,16 @@ class MockAlertRepository implements AlertRepository {
       '$_me 已确认，状态变为处理中',
       EventTone.info,
     );
+    _audit(alertId, '确认告警');
+  }
+
+  void _audit(String alertId, String verb, [String suffix = '']) {
+    final a = _require(alertId);
+    world.log(
+      '$verb「${world.deviceName(a.deviceId)} ${a.title}」$suffix',
+      kind: AuditKind.alert,
+      target: alertId,
+    );
   }
 
   @override
@@ -106,6 +118,7 @@ class MockAlertRepository implements AlertRepository {
       '$_me 指派给 ${world.nameOf(memberId)}',
       EventTone.info,
     );
+    _audit(alertId, '将告警', '指派给 ${world.nameOf(memberId)}');
   }
 
   @override
@@ -118,6 +131,7 @@ class MockAlertRepository implements AlertRepository {
       '$_me 关闭：$text',
       EventTone.neutral,
     );
+    _audit(alertId, '关闭告警');
   }
 
   @override
@@ -128,6 +142,7 @@ class MockAlertRepository implements AlertRepository {
       '$_me 重新打开',
       EventTone.warning,
     );
+    _audit(alertId, '重新打开告警');
   }
 
   @override
@@ -164,6 +179,7 @@ class MockAlertRepository implements AlertRepository {
     final a = _require(alertId);
     await world.fleet.setEstop(a.deviceId, active: true, reason: '远程趴下');
     _update(alertId, (a) => a, '$_me 远程趴下（急停通道）', EventTone.critical);
+    _audit(alertId, '处理告警', '：远程趴下');
   }
 
   @override
@@ -175,6 +191,8 @@ class MockAlertRepository implements AlertRepository {
       for (final r in _rules.value)
         r.id == ruleId ? r.copyWith(enabled: enabled) : r,
     ];
+    final r = _rules.value.where((r) => r.id == ruleId).firstOrNull;
+    if (r != null) world.log('${enabled ? '启用' : '停用'}告警规则「${r.name}」');
   }
 
   @override

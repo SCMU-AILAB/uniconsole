@@ -39,6 +39,8 @@ class MockFleetRepository implements FleetRepository {
       MockData.sessions.map((s) => s.number).fold(0, math.max) + 1;
   final _rnd = math.Random(12);
 
+  List<FleetSession> get sessions => _sessions.value;
+
   FleetSession? session(String id) =>
       _sessions.value.where((s) => s.id == id).firstOrNull;
 
@@ -110,6 +112,11 @@ class MockFleetRepository implements FleetRepository {
       world.devices.addEvent(d, '加入${s.name}', EventTone.info);
     }
     _sessions.value = [..._sessions.value, s];
+    world.log(
+      '发起联调会话 #${s.number}（${ids.length} 台）',
+      kind: AuditKind.control,
+      target: id,
+    );
     return id;
   }
 
@@ -218,6 +225,11 @@ class MockFleetRepository implements FleetRepository {
       for (final x in _sessions.value)
         if (x.id != sessionId) x,
     ];
+    world.log(
+      '结束联调会话 #${s.number}',
+      kind: AuditKind.control,
+      target: sessionId,
+    );
   }
 
   /// 设备被强制收回时从会话中移出。
