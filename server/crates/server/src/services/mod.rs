@@ -5,6 +5,7 @@ pub mod control;
 pub mod events;
 pub mod leases;
 pub mod members;
+pub mod recordings;
 pub mod safety;
 pub mod sessions;
 pub mod settings;

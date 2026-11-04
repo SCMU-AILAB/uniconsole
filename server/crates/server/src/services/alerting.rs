@@ -15,7 +15,7 @@ use crate::{
     services::{
         audit,
         control::{self, Actor},
-        events,
+        events, recordings,
     },
     state::AppState,
 };
@@ -209,6 +209,27 @@ impl AlertEngine {
             set_device_alert(st, device_id).await?;
         }
         let device = audit::device_label(st, device_id).await;
+        let now = Utc::now();
+        match recordings::auto_record(
+            st,
+            &format!("{device} {}", rule.name),
+            &[device_id.to_owned()],
+            now - chrono::Duration::seconds(60),
+            now + chrono::Duration::seconds(60),
+            "alert",
+            &alert_id.to_string(),
+        )
+        .await
+        {
+            Ok(rec) => {
+                let _ = sqlx::query("UPDATE alerts SET recording_id = $2 WHERE id = $1")
+                    .bind(alert_id)
+                    .bind(rec)
+                    .execute(&st.db)
+                    .await;
+            }
+            Err(e) => tracing::warn!(error = %e, "告警自动录制失败"),
+        }
         events::record(
             st,
             device_id,

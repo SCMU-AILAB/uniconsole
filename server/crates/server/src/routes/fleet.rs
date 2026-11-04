@@ -23,7 +23,7 @@ use crate::{
     services::{
         access, audit,
         control::{self, Actor},
-        events,
+        events, recordings,
     },
     state::AppState,
 };
@@ -239,6 +239,20 @@ async fn stop_devices(st: &AppState, ids: &[String]) {
 
 async fn end_session(st: &AppState, s: &FleetSession, by: &str) -> AppResult<()> {
     stop_devices(st, &s.device_ids).await;
+    if let Some(start) = s.started_at
+        && !s.device_ids.is_empty()
+    {
+        let _ = recordings::auto_record(
+            st,
+            &session_label(s),
+            &s.device_ids,
+            start,
+            Utc::now(),
+            "fleet",
+            &s.id.to_string(),
+        )
+        .await;
+    }
     st.leases.release_session(s.id, None).await?;
     sqlx::query(
         "UPDATE fleet_sessions SET active = FALSE, paused = FALSE, updated_at = now() WHERE id = $1",

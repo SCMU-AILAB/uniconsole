@@ -45,7 +45,8 @@ crates/
     src/app.rs           建连接池、迁移、初始管理员、后台任务、路由与中间件、优雅退出
     src/config.rs  error.rs  state.rs  extract.rs
     src/realtime/        hub（连接表 / 回执 / 事件总线）、robot_ws、client_ws、遥测批量入库
-    src/services/        control（指令唯一入口）、leases、safety、alerting、access、audit
+    src/services/        control（指令唯一入口）、leases、safety、alerting、access、audit、events、
+                         sessions（登录会话 / 限流）、members、recordings、settings（键值配置）
     src/routes/          REST，全部挂在 /api/v1
 migrations/              sqlx 迁移（只增不改：新改动写新文件），由 app::MIGRATOR 嵌入
 docs/API.md              接口与协议文档 —— 改接口必须同步更新
@@ -68,4 +69,7 @@ docs/API.md              接口与协议文档 —— 改接口必须同步更�
 
 ## 未完成（TODO）
 
-任务调度器、联调时间轴执行、围栏下发到机器人、告警通知渠道、WebRTC 信令、录制回放、固件升级 / 远程终端。
+接口形状都已在 `docs/API.md` 定下，以下能力目前返回 501 或只存数据：
+任务调度器、联调时间轴执行、围栏下发到机器人、告警通知渠道实际发送、APNs / FCM 推送、
+WebRTC 视频信令、机器人端录制（视频 / 点云）与导出、固件 OTA / 回滚 / 重启 / 远程终端 / 诊断包、
+智能体（独立服务）、对讲 TTS 播报、电池健康数据。

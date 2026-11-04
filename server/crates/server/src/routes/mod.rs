@@ -6,9 +6,12 @@ mod auth;
 mod devices;
 mod fleet;
 mod leases;
+mod maintenance;
 mod me;
 mod members;
 mod missions;
+mod planned;
+mod recordings;
 mod safety;
 
 use axum::{
@@ -118,6 +121,15 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/fleet-presets/{id}", delete(fleet::delete_preset))
         // 地图与任务（Missions.dc.html）
+        .route("/maps", get(missions::list_maps).post(missions::create_map))
+        .route(
+            "/maps/{id}",
+            get(missions::get_map)
+                .patch(missions::update_map)
+                .delete(missions::delete_map),
+        )
+        .route("/maps/{id}/chargers", post(missions::add_charger))
+        .route("/maps/{id}/remap", post(missions::remap))
         .route("/missions", get(missions::list).post(missions::create))
         .route(
             "/missions/{id}",
@@ -125,6 +137,48 @@ pub fn router(state: AppState) -> Router {
                 .patch(missions::update)
                 .delete(missions::remove),
         )
+        .route(
+            "/schedule",
+            get(missions::schedule).post(missions::add_schedule),
+        )
+        .route("/schedule/{id}", delete(missions::delete_schedule))
+        // 录制与回放（Replay.dc.html）
+        .route(
+            "/recordings",
+            get(recordings::list).post(recordings::create),
+        )
+        .route("/recordings/storage", get(recordings::storage))
+        .route(
+            "/recordings/{id}",
+            get(recordings::get).delete(recordings::remove),
+        )
+        .route("/recordings/{id}/samples", get(recordings::samples))
+        .route("/recordings/{id}/clip", post(recordings::clip))
+        .route("/recordings/{id}/export", post(recordings::export))
+        // 设备运维（Maintenance.dc.html）
+        .route("/firmware", get(maintenance::firmware))
+        .route(
+            "/firmware/release",
+            get(maintenance::get_release).put(maintenance::put_release),
+        )
+        .route("/firmware/upgrade", post(maintenance::upgrade))
+        .route("/firmware/schedule", post(maintenance::schedule_upgrade))
+        .route("/devices/{id}/rollback", post(maintenance::rollback))
+        .route("/devices/{id}/reboot", post(maintenance::reboot))
+        .route("/devices/{id}/terminal", post(maintenance::terminal))
+        .route("/diagnostics", post(maintenance::diagnostics))
+        .route("/battery-health", get(maintenance::battery_health))
+        .route("/logs", get(maintenance::logs))
+        .route(
+            "/maintenance-window",
+            get(maintenance::get_window).put(maintenance::put_window),
+        )
+        // 已规划、尚未实现（501）：智能体、对讲播报、视频信令
+        .route("/agent/{*rest}", axum::routing::any(planned::agent))
+        .route("/intercom/targets", get(planned::intercom_targets))
+        .route("/intercom/presets", get(planned::intercom_presets))
+        .route("/intercom/broadcast", post(planned::intercom_broadcast))
+        .route("/webrtc/ice-servers", get(planned::ice_servers))
         // 安全策略（Safety.dc.html）
         .route("/safety", get(safety::get))
         .route("/safety/policies", patch(safety::update_policies))

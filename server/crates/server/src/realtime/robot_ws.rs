@@ -267,6 +267,19 @@ async fn on_message(
                 _ => "neutral",
             };
             events::record(st, device_id, message.clone(), tone).await;
+            let log_level = match tone {
+                "critical" => "error",
+                "warning" => "warn",
+                _ => "info",
+            };
+            let _ = sqlx::query(
+                "INSERT INTO device_logs (device_id, level, message) VALUES ($1, $2, $3)",
+            )
+            .bind(device_id)
+            .bind(log_level)
+            .bind(format!("[{code}] {message}"))
+            .execute(&st.db)
+            .await;
             // 机器人本地急停按钮 / 遥控器急停：同步到服务端状态
             if code == "estop" {
                 st.hub.set_device_estop(device_id, true);

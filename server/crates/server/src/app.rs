@@ -78,6 +78,7 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
     let cfg = Arc::new(cfg);
     let state = build_state(cfg.clone()).await?;
     tokio::spawn(lease_sweeper(state.clone()));
+    tokio::spawn(retention_cleaner(state.clone()));
 
     let listener = tokio::net::TcpListener::bind(cfg.bind_addr).await?;
     tracing::info!("UniConsole 服务已启动：http://{}", cfg.bind_addr);
@@ -211,6 +212,36 @@ async fn lease_ended(st: &AppState, lease: &crate::models::Lease, text: &str) {
         json!({ "holder": lease.holder() }),
     )
     .await;
+}
+
+/// 每小时清理超过保留期（默认 30 天）的遥测、指令日志、设备日志
+async fn retention_cleaner(st: AppState) {
+    let mut tick = tokio::time::interval(Duration::from_secs(3600));
+    loop {
+        tick.tick().await;
+        let days = crate::services::settings::get(&st, "recording_retention_days", json!(30))
+            .await
+            .ok()
+            .and_then(|v| v.as_i64())
+            .unwrap_or(30)
+            .max(1);
+        for table in ["telemetry", "command_log", "device_logs", "device_events"] {
+            let col = match table {
+                "telemetry" => "ts",
+                "command_log" => "created_at",
+                _ => "at",
+            };
+            let sql =
+                format!("DELETE FROM {table} WHERE {col} < now() - make_interval(days => $1)");
+            if let Err(e) = sqlx::query(sqlx::AssertSqlSafe(sql))
+                .bind(days as i32)
+                .execute(&st.db)
+                .await
+            {
+                tracing::warn!(error = %e, table, "清理过期数据失败");
+            }
+        }
+    }
 }
 
 async fn shutdown_signal() {

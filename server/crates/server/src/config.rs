@@ -11,8 +11,6 @@ pub struct Config {
     pub jwt_ttl_secs: i64,
     /// 允许的前端来源；空 = 允许任意来源（仅开发）
     pub cors_origins: Vec<String>,
-    /// 单机操控租约默认时长（Lease.dc.html：5:00）
-    pub lease_default_secs: i64,
     /// 机器人多久没有任何消息判定为断联
     pub robot_timeout_ms: u64,
     /// 下发给机器人的遥测频率
@@ -27,6 +25,8 @@ pub struct Config {
     pub invite_ttl_secs: i64,
     /// 个人 API 令牌默认有效期
     pub api_token_ttl_days: i64,
+    /// WebRTC ICE 服务器（GET /webrtc/ice-servers），JSON 数组
+    pub ice_servers: serde_json::Value,
     /// 首次启动时若没有任何成员则创建管理员
     pub bootstrap_admin: Option<(String, String)>,
 }
@@ -66,7 +66,6 @@ impl Config {
                 .filter(|s| !s.is_empty())
                 .map(String::from)
                 .collect(),
-            lease_default_secs: var("LEASE_DEFAULT_SECS", 300)?,
             robot_timeout_ms: var("ROBOT_TIMEOUT_MS", 1500)?,
             telemetry_hz: var("TELEMETRY_HZ", 10)?,
             telemetry_persist_ms: var("TELEMETRY_PERSIST_MS", 1000)?,
@@ -75,6 +74,12 @@ impl Config {
                 .unwrap_or_else(|_| "uniconsole://invite/".into()),
             invite_ttl_secs: var("INVITE_TTL_SECS", 7 * 24 * 3600)?,
             api_token_ttl_days: var("API_TOKEN_TTL_DAYS", 365)?,
+            ice_servers: match env::var("ICE_SERVERS") {
+                Ok(v) if !v.trim().is_empty() => {
+                    serde_json::from_str(&v).context("ICE_SERVERS 必须是 JSON 数组")?
+                }
+                _ => serde_json::json!([]),
+            },
             bootstrap_admin,
         })
     }

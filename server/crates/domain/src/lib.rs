@@ -374,7 +374,25 @@ pub struct FleetPreset {
     pub created_at: DateTime<Utc>,
 }
 
-// ───────────── 任务 ─────────────
+// ───────────── 地图与任务 ─────────────
+
+/// 地图。坐标：米，原点在左下角，x 向右、y 向上（ROS REP-103）
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct Map {
+    pub id: String,
+    pub name: String,
+    pub short_name: String,
+    pub width_m: f32,
+    pub height_m: f32,
+    pub origin: Value,
+    pub resolution_cm: f32,
+    /// [{polygon: [[x,y],…], label, outline}]
+    pub areas: Value,
+    /// [[x, y], …]
+    pub chargers: Value,
+    pub updated_at: DateTime<Utc>,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
@@ -382,13 +400,65 @@ pub struct Mission {
     pub id: Uuid,
     pub name: String,
     pub map_id: String,
+    /// Waypoint[]：{name, x, y, yaw, stay_secs, retries, actions: [{name, detail}]}
     pub waypoints: Value,
+    /// 给人看的排期，如「每天 09:00、14:00」
     pub schedule: Option<String>,
+    /// {device_id, backup_device_id} 或 {preset_id}
     pub assignee: Value,
     pub state: MissionState,
+    /// 本轮已完成的点位数（「当前 3/8」）
+    pub completed: i32,
+    #[serde(rename = "loop")]
+    pub loop_enabled: bool,
     pub created_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct ScheduleEntry {
+    pub id: i64,
+    pub device_id: String,
+    #[serde(rename = "start")]
+    pub starts_at: DateTime<Utc>,
+    #[serde(rename = "end")]
+    pub ends_at: DateTime<Utc>,
+    pub label: String,
+    /// run | charge | other
+    pub kind: String,
+    pub mission_id: Option<Uuid>,
+}
+
+// ───────────── 录制 ─────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct RecordingRow {
+    pub id: Uuid,
+    pub name: String,
+    pub device_ids: Vec<String>,
+    #[serde(rename = "start")]
+    pub start_at: DateTime<Utc>,
+    #[serde(rename = "end")]
+    pub end_at: DateTime<Utc>,
+    pub tags: Vec<String>,
+    pub map_id: Option<String>,
+    pub source_id: Option<String>,
+    pub clip_of: Option<Uuid>,
+    pub created_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct DeviceLog {
+    pub at: DateTime<Utc>,
+    /// info | warn | error
+    pub level: String,
+    pub device_id: String,
+    pub message: String,
 }
 
 // ───────────── 告警 ─────────────

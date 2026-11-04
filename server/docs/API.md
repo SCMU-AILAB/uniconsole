@@ -27,6 +27,12 @@
 | 503 | robot_offline | 设备不在线 |
 | 504 | timeout | 等待机器人回执超时 |
 
+**单位与坐标（定稿）**：
+- 角度一律**弧度**：遥测 `roll` / `pitch` / `yaw`、`pose.yaw`、点位 `yaw`、角速度 `wz`。前端显示「度」时自行换算。
+- 地图坐标系（ROS REP-103）：单位**米**，原点在地图左下角，x 向右、y 向上；角度逆时针为正，0 指向 +x。
+  `GET /maps` 给出 `width_m` / `height_m` / `origin`，前端据此换算成界面百分比。`pose`、`polygon`、点位、充电桩都用这个坐标系。
+- 点云二维投影用**机器人坐标系**：+y 朝前、+x 朝右，单位米。
+
 枚举值与前端 HANDOFF §6 一致：
 
 | 枚举 | 取值 |
@@ -372,10 +378,97 @@ AlertEvent = {"id": 1, "alert_id": "…", "at": "…", "tone": "critical|warning
 
 ### 地图与任务（Missions.dc.html）
 
+```json
+Map = {"id": "b2", "name": "B 区 · 巡检层", "short_name": "B 区巡检层",
+       "width_m": 48, "height_m": 30, "origin": [0, 0], "resolution_cm": 5, "updated_at": "…",
+       "areas": [{"polygon": [[x, y], …], "label": "仓库", "outline": false}],   // outline=true 为外墙，只画边线
+       "chargers": [[x, y]]}
+Mission = {"id": "uuid", "name": "B 区巡检", "map_id": "b2",
+           "assignee": {"device_id": "go2-03", "backup_device_id": "go2-04"},   // 或 {"preset_id": "showroom"}
+           "schedule": "每天 09:00、14:00",       // 给人看的字符串
+           "state": "running|scheduled|paused", "completed": 3, "loop": true,
+           "waypoints": [{"name": "P1 · 配电柜", "x": 10.5, "y": 6.2, "yaw": 1.57, "stay_secs": 30, "retries": 2,
+                          "actions": [{"name": "拍照", "detail": "前置相机 · 存档"}]}],
+           "created_by": "…", "created_at": "…", "updated_at": "…"}
+ScheduleEntry = {"id": 1, "device_id": "go2-01", "start": "…", "end": "…", "label": "B 区巡检",
+                 "kind": "run|charge|other", "mission_id": "… | null"}
+```
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET / POST | /missions | `{name, map_id, waypoints[], schedule?, assignee{}, state?}` |
-| GET / PATCH / DELETE | /missions/{id} | |
+| GET | /maps | `Map[]` |
+| GET / PATCH / DELETE | /maps/{id} | 编辑：管理员 / 设备管理者 |
+| POST | /maps | 登记地图 `{id, name, short_name?, width_m, height_m, origin?, resolution_cm?, areas?, chargers?}` |
+| POST | /maps/{id}/chargers | `{x, y}` 手动标注充电桩 → `Map` |
+| POST | /maps/{id}/remap | 重新建图 → **501**（需要机器人端 SLAM） |
+| GET / POST | /missions | 新建只需 `{name, map_id}`，其余默认 |
+| GET / PATCH / DELETE | /missions/{id} | 运行 / 暂停 `{state}`；替换全部点位 `{waypoints}`；`{assignee, schedule, loop, completed}` |
+| GET | /schedule?date=YYYY-MM-DD | 当天（UTC）的排期 `ScheduleEntry[]` |
+| POST / DELETE | /schedule(/{id}) | 手动维护排期（调度器上线前） |
+
+- 设备位置不放在地图里：用遥测的 `pose` + `map_id`（同一坐标系）。
+- 变化推送 `changed: maps` / `missions` / `schedule`。
+- TODO：任务调度器（按 schedule 触发、开始前自动获取租约、逐点下发并回写 `completed`，届时推 `changed: missions`）。
+
+### 录制与回放（Replay.dc.html）
+
+当前录制内容 = 服务端持久化的 **1 Hz 遥测 + 指令日志**；视频、点云需要机器人端录制，暂不包含。
+
+```json
+Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-03"], "start": "…", "end": "…",
+             "size_bytes": 81920, "tags": ["alert|patrol|fleet|manual"],
+             "tracks": [{"kind": "joints|commands", "segments": [[0.0, 0.4], [0.5, 1.0]]}],   // 有数据的时间段，0–1
+             "events": [{"offset_ms": 12000, "label": "电机过热", "tone": "critical"}],
+             "streams": "关节 / IMU / 电量 / 指令（视频与点云需机器人端录制）",
+             "map_id": null, "source_id": "<告警 / 会话 id>", "clip_of": null, "created_by": null, "created_at": "…"}
+```
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | /recordings?tag=&device_id=&limit= | `Recording[]`，新的在前 |
+| POST | /recordings | 手动标记一段 `{name, device_ids, start, end, tags?, map_id?}` |
+| GET / DELETE | /recordings/{id} | |
+| GET | /recordings/{id}/samples | 等分 120 点：`{chart_title, device_id, temperature[], velocity[], trajectory: [[x,y]], cloud: []}`（无数据的点为 null） |
+| POST | /recordings/{id}/clip | `{from_ms, to_ms, name?}` → `{id}` |
+| POST | /recordings/{id}/export | → **501** |
+| GET | /recordings/storage | `{used_bytes, total_bytes: null, retention_days, auto_rules}` |
+
+- 自动录制：告警触发时录前后 60 秒（`alert.recording_id`），联调会话结束时录整段。
+- 遥测、指令日志、设备日志、设备事件保留 `retention_days`（默认 30 天），每小时清理一次。
+- 分享链接由前端生成 `uniconsole://replay/{id}?t=<秒>`。变化推送 `changed: recordings`。
+
+### 设备运维（Maintenance.dc.html）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | /firmware | `[{device_id, current, target, state, progress, error}]`；`state` 目前只会是 `latest · available · waiting_online` |
+| GET / PUT | /firmware/release | `{latest: {"Unitree Go2 EDU": "v1.1.8"}, agent_version, notes: []}`（PUT 仅管理员） |
+| POST | /firmware/upgrade · /firmware/schedule | → **501**（需要机器人端 OTA） |
+| POST | /devices/{id}/rollback · /reboot · /terminal | → **501** |
+| POST | /diagnostics | → **501** |
+| GET | /battery-health | `[{device_id, cycles: null, monthly: []}]`（机器人端尚未上报电池数据） |
+| GET | /logs?device_id=&level=info\|warn\|error&limit= | `[{at, level, device_id, message}]`，来自机器人上报的事件 |
+| GET / PUT | /maintenance-window | `{start_min, end_min}` 距零点的分钟数，可跨零点（默认 23:00–03:00） |
+
+### 尚未实现（501）
+
+| 模块 | 接口 | 说明 |
+|---|---|---|
+| 智能体 | `/agent/*` | 决定做成**独立服务**（复用 Go2Agent 的规划能力），服务端负责鉴权与转发；接口形状按前端交接文档 §12 |
+| 对讲 | `POST /intercom/broadcast` | TTS 播报需要机器人端音频；`GET /intercom/targets`（全部设备 + 各分组）和 `GET /intercom/presets` 已可用 |
+| 视频 | 见 §4 | `GET /webrtc/ice-servers` 已可用（环境变量 `ICE_SERVERS`，缺省 `[]` 即仅局域网直连） |
+
+### 交接文档 §16 的七项决定
+
+| # | 问题 | 决定 |
+|---|---|---|
+| 1 | 地图坐标系 | 米 + 弧度，REP-103，见「单位与坐标」；前端负责换算成百分比 |
+| 2 | 遥测角度单位 | 弧度 |
+| 3 | 邀请成员的密码 | 方案一：`POST /members` 不传密码，返回一次性邀请链接 `invite_url`（7 天有效），对方打开后自己设密码 |
+| 4 | 通用 `changed` 推送 | 加，见 §2 的 `changed.resource` 表 |
+| 5 | 点云传输 | 过渡期走 WS 二进制帧（已实现，按设备开关），以后迁到 WebRTC 数据通道 |
+| 6 | 智能体放哪 | 独立服务；服务端只做鉴权与转发，`/agent/*` 现在返回 501 |
+| 7 | 急停演练 | 机器人协议的急停指令加 `drill` 标志（已实现），`POST /safety/drill` |
 
 ### 系统
 
@@ -447,6 +540,9 @@ AlertEvent = {"id": 1, "alert_id": "…", "at": "…", "tone": "critical|warning
 | `alerts` | `GET /alerts`（单条用 `id`） |
 | `alert_rules` | `GET /alert-rules` |
 | `alert_channels` / `on_call` | `GET /alert-channels` / `GET /on-call` |
+| `maps` / `missions` / `schedule` | `GET /maps` / `GET /missions` / `GET /schedule` |
+| `recordings` | `GET /recordings` |
+| `firmware` / `maintenance_window` | `GET /firmware` / `GET /maintenance-window` |
 
 ---
 
@@ -480,6 +576,8 @@ robot → <binary> [ts i64 LE][N × (f32 x, f32 y) LE]   // 点云二维投影�
 ---
 
 ## 4. 视频（未实现）
+
+ICE 服务器：`GET /api/v1/webrtc/ice-servers`（环境变量 `ICE_SERVERS`，JSON 数组）。
 
 按 HANDOFF 预期走 WebRTC：服务器只做信令（预留在 `/api/v1/ws` 上增加 `webrtc_offer / answer / ice` 消息），
 媒体流由机器人端直接推到 SFU / 浏览器。
