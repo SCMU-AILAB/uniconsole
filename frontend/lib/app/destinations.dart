@@ -23,6 +23,8 @@ abstract final class Routes {
   static const settings = '/settings';
   static const me = '/me';
   static const gallery = '/gallery';
+  static const login = '/login';
+  static String invite(String token) => '/invite/$token';
 }
 
 class NavEntry {

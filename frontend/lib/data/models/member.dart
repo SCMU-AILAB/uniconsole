@@ -30,6 +30,7 @@ class Member {
     this.online = false,
     this.lastSeen,
     this.disabled = false,
+    this.pendingInvite = false,
   });
 
   final String id;
@@ -57,6 +58,9 @@ class Member {
   final DateTime? lastSeen;
   final bool disabled;
 
+  /// 已邀请、尚未通过邀请链接设置密码（API `pending_invite`）。
+  final bool pendingInvite;
+
   bool expired(DateTime now) => expiresAt != null && !expiresAt!.isAfter(now);
 
   Member copyWith({
@@ -69,6 +73,7 @@ class Member {
     bool? online,
     DateTime? lastSeen,
     bool? disabled,
+    bool? pendingInvite,
   }) => Member(
     id: id,
     name: name ?? this.name,
@@ -82,10 +87,11 @@ class Member {
     online: online ?? this.online,
     lastSeen: lastSeen ?? this.lastSeen,
     disabled: disabled ?? this.disabled,
+    pendingInvite: pendingInvite ?? this.pendingInvite,
   );
 }
 
-/// 邀请成员（`POST /members`）。密码由对方首次登录时设置。
+/// 邀请成员（`POST /members`，不传密码）：对方打开邀请链接后自己设置密码。
 @immutable
 class MemberDraft {
   const MemberDraft({

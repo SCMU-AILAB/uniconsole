@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/theme.dart';
@@ -41,6 +42,10 @@ class _Remove extends _Result {
   const _Remove();
 }
 
+class _Reinvite extends _Result {
+  const _Reinvite();
+}
+
 DateTime? _expiryDate(_Expiry e, DateTime now) => switch (e) {
   _Expiry.keep || _Expiry.forever => null,
   _Expiry.today =>
@@ -65,9 +70,10 @@ Future<void> showMemberDialog(
   final now = DateTime.now();
   switch (result) {
     case _Save s when member == null:
-      await runMemberAction(
+      MemberInvite? invite;
+      final ok = await runMemberAction(
         ref,
-        (repo) => repo.invite(
+        (repo) async => invite = await repo.invite(
           MemberDraft(
             name: s.name,
             handle: s.handle,
@@ -77,8 +83,21 @@ Future<void> showMemberDialog(
             videoOnly: s.videoOnly,
           ),
         ),
-        success: '已邀请 ${s.name}，对方首次登录时设置密码',
+        success: '已邀请 ${s.name}，对方打开邀请链接后设置密码',
       );
+      if (ok && invite != null && context.mounted) {
+        await showInviteLink(context, s.name, invite!);
+      }
+    case _Reinvite():
+      MemberInvite? invite;
+      final ok = await runMemberAction(
+        ref,
+        (repo) async => invite = await repo.reissueInvite(member.id),
+        success: '已重新生成 ${member!.name} 的邀请链接，旧链接已失效',
+      );
+      if (ok && invite != null && context.mounted) {
+        await showInviteLink(context, member.name, invite!);
+      }
     case _Save s:
       await runMemberAction(
         ref,
@@ -292,8 +311,15 @@ class _MemberDialogState extends ConsumerState<_MemberDialog> {
               spacing: AppSpacing.x2,
               runSpacing: AppSpacing.x2,
               children: [
+                if (m!.pendingInvite)
+                  SecondaryButton(
+                    label: '重新生成邀请链接',
+                    icon: AppIcons.link,
+                    onPressed: () =>
+                        Navigator.of(context).pop(const _Reinvite()),
+                  ),
                 SecondaryButton(
-                  label: m!.disabled ? '恢复账号' : '停用账号',
+                  label: m.disabled ? '恢复账号' : '停用账号',
                   onPressed: () =>
                       Navigator.of(context).pop(const _ToggleDisabled()),
                 ),
@@ -335,4 +361,54 @@ class _MemberDialogState extends ConsumerState<_MemberDialog> {
     MemberRole.user => '可申请被授权设备的控制权',
     MemberRole.viewer => '只能查看被授权设备，不能操控',
   };
+}
+
+/// 邀请链接（`POST /members` 的 `invite_url`）：只显示这一次，由管理员发给对方。
+Future<void> showInviteLink(
+  BuildContext context,
+  String name,
+  MemberInvite invite,
+) async {
+  final copy = await showAppDialog<bool>(
+    context: context,
+    builder: (context) {
+      final c = context.colors;
+      final t = context.type;
+      final e = invite.expiresAt;
+      return AppAlert<bool>(
+        title: '把邀请链接发给 $name',
+        maxWidth: 400,
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.x3,
+                vertical: AppSpacing.x2,
+              ),
+              decoration: BoxDecoration(
+                color: c.fillSecondary,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: SelectableText(
+                invite.url,
+                style: t.monoLarge.copyWith(color: c.label),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.x2),
+            Text(
+              '对方打开链接后自己设置密码。链接只能使用一次，'
+              '${e.month} 月 ${e.day} 日前有效；以后在成员详情里可以重新生成。',
+              style: t.footnote.copyWith(color: c.secondaryLabel),
+            ),
+          ],
+        ),
+        actions: const [
+          AlertAction(label: '完成', value: false, kind: AlertActionKind.cancel),
+          AlertAction(label: '复制链接', value: true),
+        ],
+      );
+    },
+  );
+  if (copy == true) await Clipboard.setData(ClipboardData(text: invite.url));
 }

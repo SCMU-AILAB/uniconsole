@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../repositories/repositories.dart';
 import 'mock_agent.dart';
 import 'mock_alerts.dart';
+import 'mock_auth.dart';
 import 'mock_data.dart';
 import 'mock_fleet.dart';
 import 'mock_leases.dart';
@@ -20,6 +21,7 @@ import 'mock_store.dart';
 
 export 'mock_agent.dart';
 export 'mock_alerts.dart';
+export 'mock_auth.dart';
 export 'mock_fleet.dart';
 export 'mock_leases.dart';
 export 'mock_maintenance.dart';
@@ -32,8 +34,13 @@ export 'mock_safety.dart';
 /// 所有 mock 仓库的集合，彼此之间共享状态（控制指令 → 模拟机器人 → 遥测、事件；
 /// 控制权 ↔ 联调会话 ↔ 全局急停）。
 class MockWorld {
-  MockWorld({this.telemetryHz = 10, this.currentUserId = 'kanade'}) {
+  MockWorld({
+    this.telemetryHz = 10,
+    this.currentUserId = 'kanade',
+    bool signedIn = true,
+  }) {
     members = MockMemberRepository(world: this);
+    auth = MockAuthRepository(world: this, signedIn: signedIn);
     devices = MockDeviceRepository();
     leases = MockLeaseRepository(world: this);
     fleet = MockRobotFleet(world: this);
@@ -48,7 +55,10 @@ class MockWorld {
   }
 
   final int telemetryHz;
-  final String currentUserId;
+
+  /// 当前登录的成员；未登录时保留上一位（mock 里其他仓库仍按它判断权限）。
+  String currentUserId;
+  late final MockAuthRepository auth;
   late final MockDeviceRepository devices;
   late final MockLeaseRepository leases;
   late final MockRobotFleet fleet;
@@ -64,6 +74,14 @@ class MockWorld {
   final recordings = MockRecordingRepository();
 
   Member get me => members.member(currentUserId)!;
+
+  /// 登录成功：切换当前成员并标记在线。
+  void signIn(String memberId) {
+    currentUserId = memberId;
+    members.setOnline(memberId, online: true);
+  }
+
+  void signOut() => members.setOnline(currentUserId, online: false);
 
   String nameOf(String userId) => members.member(userId)?.name ?? userId;
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/core/theme/theme.dart';
+import 'package:uniconsole/data/mock/mock_repositories.dart';
+import 'package:uniconsole/data/providers.dart';
 import 'package:uniconsole/main.dart';
 
 /// 打开应用并逐帧推进（页面上有每秒刷新的倒计时，不能 pumpAndSettle）。
@@ -10,13 +12,24 @@ Future<ProviderContainer> open(
   required String location,
   double width = 1440,
   double height = 1200,
+  bool signedIn = true,
 }) async {
   tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   // 容器由 ProviderScope 持有：卸载界面即释放，mock 的定时器随之停止。
   await tester.pumpWidget(
-    ProviderScope(child: UniConsoleApp(initialLocation: location)),
+    ProviderScope(
+      overrides: [
+        if (!signedIn)
+          mockWorldProvider.overrideWith((ref) {
+            final world = MockWorld(signedIn: false);
+            ref.onDispose(world.dispose);
+            return world;
+          }),
+      ],
+      child: UniConsoleApp(initialLocation: location),
+    ),
   );
   final container = ProviderScope.containerOf(
     tester.element(find.byType(UniConsoleApp)),

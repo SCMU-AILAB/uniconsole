@@ -8,12 +8,22 @@ import 'core/dev/debug_screenshot.dart';
 import 'core/platform/orientation.dart';
 import 'core/theme/theme.dart';
 import 'core/widgets/widgets.dart';
+import 'data/mock/mock_repositories.dart';
 import 'data/providers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   AppOrientation.portrait();
-  final container = ProviderContainer();
+  final container = ProviderContainer(
+    overrides: [
+      if (debugSignedOut)
+        mockWorldProvider.overrideWith((ref) {
+          final world = MockWorld(signedIn: false);
+          ref.onDispose(world.dispose);
+          return world;
+        }),
+    ],
+  );
   switch (debugThemeOverride) {
     case 'light':
       container.read(themeModeProvider.notifier).set(ThemeMode.light);
@@ -43,6 +53,7 @@ class UniConsoleApp extends ConsumerStatefulWidget {
 class _UniConsoleAppState extends ConsumerState<UniConsoleApp> {
   late final GoRouter _router = buildRouter(
     initialLocation: widget.initialLocation,
+    auth: ref.read(authRepositoryProvider),
   );
 
   @override

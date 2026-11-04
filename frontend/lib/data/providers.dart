@@ -27,6 +27,9 @@ final fleetRepositoryProvider = Provider<FleetRepository>(
 final leaseRepositoryProvider = Provider<LeaseRepository>(
   (ref) => ref.watch(mockWorldProvider).leases,
 );
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => ref.watch(mockWorldProvider).auth,
+);
 final memberRepositoryProvider = Provider<MemberRepository>(
   (ref) => ref.watch(mockWorldProvider).members,
 );
@@ -131,6 +134,11 @@ final leasesProvider = StreamProvider<List<Lease>>(
 );
 final membersProvider = StreamProvider<List<Member>>(
   (ref) => ref.watch(memberRepositoryProvider).watchMembers(),
+);
+
+/// 登录会话；null 为未登录（路由跳到登录页）。
+final authSessionProvider = StreamProvider<AuthSession?>(
+  (ref) => ref.watch(authRepositoryProvider).watchSession(),
 );
 final currentUserProvider = StreamProvider<Member>(
   (ref) => ref.watch(memberRepositoryProvider).watchCurrentUser(),

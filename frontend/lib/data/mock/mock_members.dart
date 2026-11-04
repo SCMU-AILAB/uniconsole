@@ -77,32 +77,68 @@ class MockMemberRepository implements MemberRepository {
     (all) => all.firstWhere((m) => m.id == world.currentUserId),
   );
 
-  @override
-  Future<String> invite(MemberDraft d) async {
-    _requireAdmin();
-    final handle = d.handle.startsWith('@') ? d.handle : '@${d.handle}';
-    if (d.name.trim().isEmpty || handle.length < 2) {
-      throw const MemberException('bad_request', '请填写姓名和账号');
-    }
-    if (_members.value.any((m) => m.handle == handle)) {
-      throw MemberException('conflict', '账号 $handle 已存在');
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 120));
+  /// 登录 / 退出：在线状态与最近活动（同时让 [watchCurrentUser] 推送新的当前成员）。
+  void setOnline(String id, {required bool online}) =>
+      _set(id, (m) => m.copyWith(online: online, lastSeen: DateTime.now()));
+
+  /// 建一个等待设置密码的成员，返回 id（不做权限检查，由调用方负责）。
+  String addInvited(MemberDraft d) {
     final id = 'm${DateTime.now().microsecondsSinceEpoch}';
     _members.value = [
       ..._members.value,
       Member(
         id: id,
         name: d.name.trim(),
+        handle: d.handle.startsWith('@') ? d.handle : '@${d.handle}',
+        role: d.role,
+        expiresAt: d.expiresAt,
+        grantedDeviceIds: d.grantedDeviceIds,
+        videoOnly: d.videoOnly,
+        pendingInvite: true,
+      ),
+    ];
+    return id;
+  }
+
+  /// 通过邀请链接设置了密码。
+  void activate(String id) => _set(id, (m) => m.copyWith(pendingInvite: false));
+
+  @override
+  Future<MemberInvite> invite(MemberDraft d) async {
+    _requireAdmin();
+    final handle = d.handle.startsWith('@') ? d.handle : '@${d.handle}';
+    if (d.name.trim().isEmpty || handle.length < 2) {
+      throw const MemberException('bad_request', '请填写姓名和账号');
+    }
+    final key = handle.toLowerCase();
+    if (_members.value.any((m) => m.handle.toLowerCase() == key)) {
+      throw MemberException('conflict', '账号 $handle 已存在');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final id = addInvited(
+      MemberDraft(
+        name: d.name,
         handle: handle,
         role: d.role,
         expiresAt: d.expiresAt,
         grantedDeviceIds: d.grantedDeviceIds,
         videoOnly: d.videoOnly,
       ),
-    ];
+    );
     log('邀请 ${d.name.trim()} 为${d.role.label}，${expiryText(d.expiresAt)}');
-    return id;
+    return world.auth.issueInvite(id);
+  }
+
+  @override
+  Future<MemberInvite> reissueInvite(String id) async {
+    _requireAdmin();
+    final m = member(id);
+    if (m == null) throw const MemberException('not_found', '成员不存在');
+    if (!m.pendingInvite) {
+      throw const MemberException('conflict', '对方已设置密码，不需要邀请链接');
+    }
+    log('重新生成 ${m.name} 的邀请链接');
+    return world.auth.issueInvite(id);
   }
 
   @override

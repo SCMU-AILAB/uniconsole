@@ -19,6 +19,7 @@ class GroupedListRow extends StatelessWidget {
     this.titleWeight,
     this.titleTrailing,
     this.detail,
+    this.destructive = false,
   });
 
   final String title;
@@ -40,6 +41,9 @@ class GroupedListRow extends StatelessWidget {
 
   /// 第三行说明（MobileFleet 的「管理 X · 使用 Y」）。
   final String? detail;
+
+  /// 危险操作行（「退出登录」）：标题为红色。
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
@@ -83,11 +87,12 @@ class GroupedListRow extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: (mobile ? t.mobileBody : t.body).copyWith(
-                          color:
-                              value != null &&
-                                  subtitle == null &&
-                                  leading == null &&
-                                  !mobile
+                          color: destructive
+                              ? context.status.critical.fg
+                              : value != null &&
+                                    subtitle == null &&
+                                    leading == null &&
+                                    !mobile
                               ? c.secondaryLabel
                               : c.label,
                           fontWeight: titleWeight,

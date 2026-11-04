@@ -66,6 +66,12 @@ String? get debugInitialRoute {
   return v == null || v.isEmpty ? null : v;
 }
 
+/// 仅 debug：`UNICONSOLE_SIGNED_OUT=1` 以未登录状态启动（截图登录页）。
+bool get debugSignedOut {
+  if (!kDebugMode || kIsWeb) return false;
+  return Platform.environment['UNICONSOLE_SIGNED_OUT'] == '1';
+}
+
 /// 仅 debug：`UNICONSOLE_DEMO_PUSH=1` 启动 1 秒后模拟一条新告警，用于截图推送横幅。
 bool get debugDemoPush {
   if (!kDebugMode || kIsWeb) return false;

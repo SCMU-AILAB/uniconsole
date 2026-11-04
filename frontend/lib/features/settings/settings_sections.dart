@@ -5,6 +5,7 @@ import '../../core/theme/theme.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/models/models.dart';
 import '../../data/providers.dart';
+import '../auth/sign_out.dart';
 import 'settings_widgets.dart';
 
 /// 类别对应的内容。
@@ -627,7 +628,7 @@ class AccountSettings extends ConsumerWidget {
       children: [
         SettingsGroup(
           children: [
-            const SettingsRow(label: '登录方式', value: 'Apple / 企业 SSO'),
+            const SettingsRow(label: '登录方式', value: '账号与密码'),
             SettingsRow(
               label: '二次验证',
               subtitle: '远程终端和强制收回需要',
@@ -654,6 +655,18 @@ class AccountSettings extends ConsumerWidget {
                 '${tokens.length} 个 · 用于智能体与自动化',
                 () => _tokensDialog(context),
                 'API 令牌：${tokens.length} 个',
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          children: [
+            SettingsRow(
+              label: '退出登录',
+              subtitle: '在这台设备上退出当前账户',
+              trailing: DestructiveButton(
+                label: '退出登录',
+                onPressed: () => confirmSignOut(context, ref),
               ),
             ),
           ],

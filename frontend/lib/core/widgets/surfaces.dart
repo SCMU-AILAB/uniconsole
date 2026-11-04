@@ -322,7 +322,7 @@ class ProgressBar extends StatelessWidget {
   }
 }
 
-enum BannerKind { emergency, success, info, warning }
+enum BannerKind { emergency, success, info, warning, critical }
 
 /// 横幅提示。emergency 为急停后的红色提示条（白字、实底），其余为浅底彩字。
 class AppBanner extends StatelessWidget {
@@ -346,6 +346,7 @@ class AppBanner extends StatelessWidget {
       BannerKind.success => (s.online.bg, s.online.fg, AppIcons.check),
       BannerKind.info => (s.busy.bg, s.busy.fg, AppIcons.info),
       BannerKind.warning => (s.warning.bg, s.warning.fg, AppIcons.warning),
+      BannerKind.critical => (s.critical.bg, s.critical.fg, AppIcons.warning),
     };
     return Semantics(
       liveRegion: true,

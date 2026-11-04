@@ -266,6 +266,38 @@ abstract interface class SafetyRepository {
   Future<void> deleteZone(String id);
 }
 
+/// 登录与会话（API「认证」）。
+///
+/// 登录态由服务端会话管理：退出、被踢下线、停用账号都会让令牌立即失效，
+/// 之后任何请求返回 401，此时实现应清掉会话（[watchSession] 推送 null），界面回到登录页。
+abstract interface class AuthRepository {
+  /// 当前会话；未登录为 null。启动时从系统钥匙串恢复。
+  AuthSession? get session;
+
+  Stream<AuthSession?> watchSession();
+
+  /// 上次登录用的服务器地址，登录页预填。
+  String get lastServer;
+
+  /// `POST /auth/login {handle, password, code?, device_name?}`。
+  /// 失败时抛 [AuthException]；`two_factor_required` 表示要带 [code] 再提交一次。
+  Future<AuthSession> login({
+    required String server,
+    required String handle,
+    required String password,
+    String? code,
+  });
+
+  /// `POST /auth/logout`：吊销当前会话。
+  Future<void> logout();
+
+  /// `GET /auth/invites/{token}`；无效或过期抛 `not_found`。
+  Future<InviteInfo> invite(String token);
+
+  /// `POST /auth/invites/{token}/accept {password}`：设置密码并直接登录。
+  Future<AuthSession> acceptInvite(String token, String password);
+}
+
 /// 成员与权限（API §1 认证与成员）。违反规则时抛 [MemberException]。
 abstract interface class MemberRepository {
   /// `GET /members`。
@@ -274,8 +306,11 @@ abstract interface class MemberRepository {
   /// 当前登录的成员（`GET /auth/me`）。
   Stream<Member> watchCurrentUser();
 
-  /// `POST /members`（管理员）→ 新成员 id。
-  Future<String> invite(MemberDraft draft);
+  /// `POST /members`（管理员，不传密码）→ 一次性邀请链接，7 天有效。
+  Future<MemberInvite> invite(MemberDraft draft);
+
+  /// `POST /members/{id}/invite`：重新生成邀请链接，旧链接作废。
+  Future<MemberInvite> reissueInvite(String id);
 
   /// `PATCH /members/{id}` + `PUT /members/{id}/devices`。
   Future<void> update(

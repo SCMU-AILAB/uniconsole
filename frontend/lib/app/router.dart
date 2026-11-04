@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/layout/app_route_page.dart';
 import '../core/theme/theme.dart';
+import '../data/repositories/repositories.dart';
 import '../features/agent/agent_page.dart';
 import '../features/alerts/alert_detail_page.dart';
 import '../features/alerts/alerts_page.dart';
+import '../features/auth/invite_page.dart';
+import '../features/auth/login_page.dart';
 import '../features/control/control_page.dart';
 import '../features/devices/device_detail_page.dart';
 import '../features/devices/devices_page.dart';
@@ -24,7 +29,13 @@ import 'destinations.dart';
 import 'shell.dart';
 
 /// 路由表（HANDOFF.md §2）。桌面与移动共用同一套路由，只是布局不同。
-GoRouter buildRouter({String initialLocation = Routes.devices}) {
+///
+/// 传入 [auth] 时启用登录守卫：未登录只能打开登录页和邀请页，其余地址跳到
+/// `/login?from=<原地址>`，登录后回到原地址；会话失效（退出、被踢下线）时立即跳回登录页。
+GoRouter buildRouter({
+  String initialLocation = Routes.devices,
+  AuthRepository? auth,
+}) {
   // 根页面瞬时切换，push 进入时 iOS 推入（§13）。
   Page<void> page(GoRouterState state, Widget child) => AppRoutePage(
     key: state.pageKey,
@@ -32,10 +43,44 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
     child: child,
   );
 
+  String? guard(GoRouterState state) {
+    final path = state.uri.path;
+    if (path == '/') return Routes.devices;
+    if (auth == null) return null;
+    final open = path == Routes.login || path.startsWith('/invite/');
+    final signedIn = auth.session != null;
+    if (!signedIn && !open) {
+      return Uri(
+        path: Routes.login,
+        queryParameters: {'from': state.uri.toString()},
+      ).toString();
+    }
+    if (signedIn && path == Routes.login) {
+      final from = state.uri.queryParameters['from'];
+      return from != null && from.startsWith('/') && !from.startsWith('/login')
+          ? from
+          : Routes.devices;
+    }
+    return null;
+  }
+
   return GoRouter(
     initialLocation: initialLocation,
-    redirect: (context, state) => state.uri.path == '/' ? Routes.devices : null,
+    refreshListenable: auth == null ? null : _SessionListenable(auth),
+    redirect: (context, state) => guard(state),
     routes: [
+      GoRoute(
+        path: Routes.login,
+        pageBuilder: (context, state) =>
+            NoTransitionPage(key: state.pageKey, child: const LoginPage()),
+      ),
+      GoRoute(
+        path: '/invite/:token',
+        pageBuilder: (context, state) => NoTransitionPage(
+          key: state.pageKey,
+          child: InvitePage(token: state.pathParameters['token']!),
+        ),
+      ),
       ShellRoute(
         // 外壳本身不做转场、不加遮罩（macOS / iOS 上默认的 CupertinoPage 会压暗整个窗口）。
         pageBuilder: (context, state, child) => NoTransitionPage(
@@ -179,4 +224,19 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
       ),
     ],
   );
+}
+
+/// 会话变化时让路由重新执行守卫（登录 → 回原页面；退出 / 失效 → 登录页）。
+class _SessionListenable extends ChangeNotifier {
+  _SessionListenable(AuthRepository auth) {
+    _sub = auth.watchSession().skip(1).listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<Object?> _sub;
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
 }

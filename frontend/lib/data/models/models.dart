@@ -1,5 +1,6 @@
 export 'agent.dart';
 export 'alert.dart';
+export 'auth.dart';
 export 'command.dart';
 export 'device.dart';
 export 'fleet.dart';

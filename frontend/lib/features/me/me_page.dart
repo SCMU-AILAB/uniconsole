@@ -9,6 +9,7 @@ import '../../core/layout/app_route_page.dart';
 import '../../core/theme/theme.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/providers.dart';
+import '../auth/sign_out.dart';
 
 /// 移动端「我的」：个人信息 + 标签栏之外的页面入口（HANDOFF.md §2：移动端没有画的页面
 /// 先用桌面布局的单列堆叠版本）。桌面宽度下同样可访问。
@@ -81,6 +82,16 @@ class MePage extends ConsumerWidget {
               ),
             ],
           ),
+        InsetGroupedSection(
+          children: [
+            GroupedListRow(
+              title: '退出登录',
+              destructive: true,
+              showChevron: false,
+              onTap: () => confirmSignOut(context, ref),
+            ),
+          ],
+        ),
       ],
     );
   }

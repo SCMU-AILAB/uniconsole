@@ -33,6 +33,7 @@ bool _sameDay(DateTime a, DateTime b) =>
 /// 「在线」「3 小时前」「今天」「昨天」「10 月 31 日」。
 String lastSeenText(Member m, DateTime now) {
   if (m.disabled) return '已停用';
+  if (m.pendingInvite) return '已邀请，等待设置密码';
   if (m.online) return '在线';
   final t = m.lastSeen;
   if (t == null) return '未登录';

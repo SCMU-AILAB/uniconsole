@@ -263,6 +263,14 @@ class AppTextField extends StatefulWidget {
     this.autofocus = false,
     this.semanticLabel,
     this.mobile = false,
+    this.focusNode,
+    this.obscureText = false,
+    this.keyboardType,
+    this.textInputAction,
+    this.autofillHints,
+    this.enabled = true,
+    this.suffix,
+    this.monospace = false,
   });
 
   final String hint;
@@ -277,33 +285,70 @@ class AppTextField extends StatefulWidget {
   /// 移动端字号 16（避免 iOS 聚焦时自动放大）。
   final bool mobile;
 
+  /// 外部焦点（表单里按回车跳到下一项）；为空时内部创建。
+  final FocusNode? focusNode;
+
+  /// 密码。
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+
+  /// 系统密码管理器自动填充（[AutofillHints.username] 等）。
+  final Iterable<String>? autofillHints;
+  final bool enabled;
+
+  /// 输入框右侧的附件（如「显示密码」按钮）。
+  final Widget? suffix;
+
+  /// 等宽字体（验证码）。
+  final bool monospace;
+
   @override
   State<AppTextField> createState() => _AppTextFieldState();
 }
 
 class _AppTextFieldState extends State<AppTextField> {
-  final _focus = FocusNode();
+  FocusNode? _own;
+  FocusNode get _focus => widget.focusNode ?? (_own ??= FocusNode());
 
   @override
   void initState() {
     super.initState();
-    _focus.addListener(() => setState(() {}));
+    _focus.addListener(_changed);
   }
 
   @override
+  void didUpdateWidget(AppTextField old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      (old.focusNode ?? _own)?.removeListener(_changed);
+      _focus.addListener(_changed);
+    }
+  }
+
+  void _changed() => setState(() {});
+
+  @override
   void dispose() {
-    _focus.dispose();
+    _focus.removeListener(_changed);
+    _own?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final base = widget.mobile
+        ? context.type.mobileBody.copyWith(fontSize: 16)
+        : context.type.body.copyWith(fontSize: 12.5);
     final style =
-        (widget.mobile
-                ? context.type.mobileBody.copyWith(fontSize: 16)
-                : context.type.body.copyWith(fontSize: 12.5))
-            .copyWith(color: c.label);
+        (widget.monospace
+                ? context.type.monoLarge.copyWith(
+                    fontSize: base.fontSize,
+                    letterSpacing: 2,
+                  )
+                : base)
+            .copyWith(color: widget.enabled ? c.label : c.secondaryLabel);
     final focused = _focus.hasFocus;
     final multiline = widget.minLines > 1;
     return AnimatedContainer(
@@ -314,7 +359,7 @@ class _AppTextFieldState extends State<AppTextField> {
         vertical: AppSpacing.x2,
       ),
       decoration: BoxDecoration(
-        color: c.surface,
+        color: widget.enabled ? c.surface : c.fillSecondary,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: focused ? c.accent : c.controlBorder),
         boxShadow: [
@@ -329,23 +374,47 @@ class _AppTextFieldState extends State<AppTextField> {
         textField: true,
         child: Material(
           type: MaterialType.transparency,
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _focus,
-            autofocus: widget.autofocus,
-            onChanged: widget.onChanged,
-            onSubmitted: widget.onSubmitted,
-            minLines: widget.minLines,
-            maxLines: multiline ? (widget.maxLines ?? widget.minLines + 4) : 1,
-            keyboardType: multiline ? TextInputType.multiline : null,
-            textInputAction: multiline ? null : TextInputAction.done,
-            style: style,
-            cursorColor: c.accent,
-            cursorHeight: style.fontSize! + 2,
-            decoration: InputDecoration.collapsed(
-              hintText: widget.hint,
-              hintStyle: style.copyWith(color: c.secondaryLabel),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _focus,
+                  autofocus: widget.autofocus,
+                  enabled: widget.enabled,
+                  onChanged: widget.onChanged,
+                  onSubmitted: widget.onSubmitted,
+                  obscureText: widget.obscureText,
+                  autocorrect: !widget.obscureText,
+                  enableSuggestions: !widget.obscureText,
+                  autofillHints: widget.autofillHints,
+                  minLines: widget.minLines,
+                  maxLines: multiline
+                      ? (widget.maxLines ?? widget.minLines + 4)
+                      : 1,
+                  keyboardType:
+                      widget.keyboardType ??
+                      (multiline ? TextInputType.multiline : null),
+                  textInputAction:
+                      widget.textInputAction ??
+                      (multiline ? null : TextInputAction.done),
+                  style: style,
+                  cursorColor: c.accent,
+                  cursorHeight: style.fontSize! + 2,
+                  decoration: InputDecoration.collapsed(
+                    hintText: widget.hint,
+                    hintStyle: style.copyWith(
+                      color: c.secondaryLabel,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ),
+              if (widget.suffix != null) ...[
+                const SizedBox(width: AppSpacing.x2),
+                widget.suffix!,
+              ],
+            ],
           ),
         ),
       ),
