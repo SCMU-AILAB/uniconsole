@@ -7,6 +7,8 @@ import 'app/router.dart';
 import 'core/dev/debug_screenshot.dart';
 import 'core/platform/orientation.dart';
 import 'core/theme/theme.dart';
+import 'core/widgets/widgets.dart';
+import 'data/providers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +64,10 @@ class _UniConsoleAppState extends ConsumerState<UniConsoleApp> {
       themeAnimationDuration: AppMotion.appearance,
       themeAnimationCurve: AppMotion.appearanceCurve,
       routerConfig: _router,
+      builder: (context, child) => HudOpacity(
+        opacity: ref.watch(preferencesProvider).hudOpacity,
+        child: child!,
+      ),
     );
   }
 }

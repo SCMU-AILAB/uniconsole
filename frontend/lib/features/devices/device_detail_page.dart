@@ -275,7 +275,7 @@ class _LiveChip extends StatelessWidget {
         vertical: AppSpacing.x1,
       ),
       decoration: BoxDecoration(
-        color: c.hudOverlay,
+        color: context.hudOverlay,
         borderRadius: BorderRadius.circular(AppRadius.xs),
       ),
       child: Row(

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
 import 'package:uniconsole/data/models/models.dart';
 import 'package:uniconsole/data/providers.dart';
 import 'package:uniconsole/features/agent/intercom_widgets.dart';
+import 'package:uniconsole/features/control/control_input.dart';
+import 'package:uniconsole/features/devices/devices_page.dart';
 
 import 'helpers.dart';
 
@@ -135,9 +138,86 @@ void main() {
     });
   });
 
+  group('设置', () {
+    testWidgets('类别写在地址里；修改偏好立即生效', (tester) async {
+      final container = await open(tester, location: Routes.settings);
+      expect(find.text('操控时保持深色'), findsOneWidget);
+      await tapText(tester, '大');
+      expect(
+        container.read(preferencesProvider).sidebarIconSize,
+        SidebarIconSize.large,
+      );
+      await tester.tap(find.bySemanticsLabel('操控时保持深色').last);
+      await settle(tester);
+      expect(container.read(preferencesProvider).darkWhileControlling, isFalse);
+
+      await tapText(tester, '控制与手柄');
+      expect(find.text('Xbox 无线控制器'), findsOneWidget);
+      // 「站立」改绑到 B：与原来的「趴下」互换。
+      await tester.ensureVisible(find.text('重新绑定').at(2));
+      await tester.tap(find.text('重新绑定').at(2));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(MenuItemButton, 'B'));
+      await settle(tester);
+      final b = container.read(preferencesProvider).bindings;
+      expect(b.firstWhere((x) => x.action == '站立').control, 'B');
+      expect(b.firstWhere((x) => x.action == '趴下').control, 'A');
+      await close(tester);
+    });
+
+    testWidgets('手机：类别列表 → 进入通知', (tester) async {
+      await open(tester, location: Routes.settings, width: 390, height: 844);
+      await tapText(tester, '通知');
+      await settle(tester);
+      expect(find.text('严重告警'), findsOneWidget);
+      expect(find.text('横幅 + 声音 + 突破专注模式'), findsOneWidget);
+      await close(tester);
+    });
+
+    test('摇杆死区与响应曲线', () {
+      expect(
+        shapeStick(const Offset(0.05, 0), 0.1, ResponseCurve.linear),
+        Offset.zero,
+      );
+      expect(
+        shapeStick(const Offset(0, 1), 0.1, ResponseCurve.linear).dy,
+        closeTo(1, 1e-9),
+      );
+      expect(
+        shapeAxis(-0.55, 0.1, ResponseCurve.exponential),
+        closeTo(-0.25, 1e-9),
+      );
+    });
+
+    testWidgets('⌘K 命令面板：搜索设备并回车打开', (tester) async {
+      await open(tester, location: Routes.members);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await settle(tester);
+      await tester.enterText(find.byType(TextField).last, 'Bravo');
+      await settle(tester);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await settle(tester);
+      // 桌面宽度下是设备总览并选中该设备。
+      expect(find.byType(DevicesPage), findsOneWidget);
+      await close(tester);
+    });
+  });
+
   for (final width in [1440.0, 1000.0, 760.0, 390.0]) {
     testWidgets('第 6 阶段页面在 ${width.toInt()} 宽下无溢出', (tester) async {
-      for (final loc in [Routes.members, Routes.agent, '/agent?mode=talk']) {
+      for (final loc in [
+        Routes.members,
+        Routes.agent,
+        '/agent?mode=talk',
+        Routes.settings,
+        '/settings/pad',
+        '/settings/keys',
+        '/settings/net',
+        '/settings/notify',
+        '/settings/account',
+      ]) {
         await open(tester, location: loc, width: width, height: 900);
         expect(tester.takeException(), isNull, reason: loc);
         await close(tester);

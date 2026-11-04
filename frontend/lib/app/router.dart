@@ -157,6 +157,13 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
             ),
           ),
           GoRoute(
+            path: '/settings/:category',
+            pageBuilder: (context, state) => page(
+              state,
+              SettingsPage(category: state.pathParameters['category']),
+            ),
+          ),
+          GoRoute(
             path: Routes.settings,
             pageBuilder: (context, state) => page(state, const SettingsPage()),
           ),

@@ -8,6 +8,7 @@ import '../core/theme/theme.dart';
 import '../core/widgets/widgets.dart';
 import '../data/providers.dart';
 import '../features/fleet/fleet_widgets.dart';
+import 'command_palette.dart';
 import 'destinations.dart';
 
 /// 「单机操控」「感知中心」默认打开的设备：当前用户正在使用的第一台，否则第一台。
@@ -142,7 +143,8 @@ class ShellScaffold extends ConsumerWidget {
             : t,
     ];
 
-    return CallbackShortcuts(
+    final prefs = ref.watch(preferencesProvider);
+    final shell = CallbackShortcuts(
       bindings: {
         // Settings.dc.html 快捷键：⌘J 呼出智能体；⌘, 为 macOS 通用的设置。
         const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () =>
@@ -151,6 +153,10 @@ class ShellScaffold extends ConsumerWidget {
             go('agent'),
         const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
             go('settings'),
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () =>
+            showCommandPalette(context),
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
+            showCommandPalette(context),
         const SingleActivator(LogicalKeyboardKey.keyE, meta: true, shift: true):
             globalEstop,
         const SingleActivator(
@@ -177,9 +183,18 @@ class ShellScaffold extends ConsumerWidget {
                 ),
           onUserSettings: () => go('settings'),
           immersive: tabIdFor(location) == 'control',
+          sidebarIconSize: prefs.sidebarIconSize.icon,
           child: child,
         ),
       ),
+    );
+    // 设置 › 外观「操控时保持深色」：操控页整窗使用深色。
+    if (!prefs.darkWhileControlling || tabIdFor(location) != 'control') {
+      return shell;
+    }
+    return Theme(
+      data: AppTheme.dark(swatch: ref.watch(accentProvider)),
+      child: shell,
     );
   }
 }

@@ -513,7 +513,7 @@ class _CameraGrid extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: cam.health == SourceHealth.idle
-                              ? c.hudOverlay
+                              ? context.hudOverlay
                               : c.videoBackground,
                           borderRadius: BorderRadius.circular(AppRadius.group),
                         ),

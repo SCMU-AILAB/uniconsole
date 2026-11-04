@@ -70,6 +70,23 @@ class ControlInputState {
   };
 }
 
+/// 死区内归零，死区外重新映射到 0–1；指数曲线让低速更细腻（m²）。
+double _shape(double m, double deadzone, ResponseCurve curve) {
+  if (m <= deadzone) return 0;
+  final x = ((m - deadzone) / (1 - deadzone)).clamp(0.0, 1.0);
+  return curve == ResponseCurve.exponential ? x * x : x;
+}
+
+Offset shapeStick(Offset v, double deadzone, ResponseCurve curve) {
+  final m = v.distance;
+  if (m == 0) return Offset.zero;
+  final shaped = _shape(m.clamp(0.0, 1.0), deadzone, curve);
+  return v / m * shaped;
+}
+
+double shapeAxis(double v, double deadzone, ResponseCurve curve) =>
+    v.sign * _shape(v.abs().clamp(0.0, 1.0), deadzone, curve);
+
 /// 把输入变成指令（HANDOFF §8.4 / API §2）：
 /// - 有输入时以 15 Hz 发送 `move`；
 /// - 所有输入松开后等待 300 ms，再显式发送一次 `stop`；
@@ -96,9 +113,16 @@ class ControlInput extends Notifier<ControlInputState> {
     return const ControlInputState();
   }
 
-  void setStick(Offset v) => _set(state.copyWith(stick: v));
+  /// 摇杆输入按偏好（设置 › 控制与手柄）处理死区与响应曲线。
+  void setStick(Offset v) {
+    final p = ref.read(preferencesProvider);
+    _set(state.copyWith(stick: shapeStick(v, p.deadzone, p.curve)));
+  }
 
-  void setTurn(double v) => _set(state.copyWith(turn: v));
+  void setTurn(double v) {
+    final p = ref.read(preferencesProvider);
+    _set(state.copyWith(turn: shapeAxis(v, p.deadzone, p.curve)));
+  }
 
   void setSpeed(SpeedLevel level) => state = state.copyWith(speed: level);
 

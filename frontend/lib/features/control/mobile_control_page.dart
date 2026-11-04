@@ -101,7 +101,7 @@ class _Landscape extends ConsumerWidget {
     final pad = MediaQuery.paddingOf(context);
     // 刘海一侧至少留 52pt（设计稿 50，按 4pt 网格取 52）。
     final side = math.max(AppSpacing.x8 + AppSpacing.x5, pad.left);
-    final panel = c.hudOverlay;
+    final panel = context.hudOverlay;
 
     Widget pill({required Widget child, EdgeInsets? padding}) => Container(
       padding:

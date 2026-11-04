@@ -144,6 +144,25 @@ class _Crosshair extends StatelessWidget {
   }
 }
 
+/// 视频画面信息层（HUD）的不透明度（设置 › 外观，默认 0.72）。
+class HudOpacity extends InheritedWidget {
+  const HudOpacity({super.key, required this.opacity, required super.child});
+
+  final double opacity;
+
+  static double of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<HudOpacity>()?.opacity ?? 0.72;
+
+  @override
+  bool updateShouldNotify(HudOpacity old) => old.opacity != opacity;
+}
+
+extension HudColors on BuildContext {
+  /// HUD 浮层底色，按 [HudOpacity] 调整透明度。
+  Color get hudOverlay =>
+      colors.hudOverlay.withValues(alpha: HudOpacity.of(this));
+}
+
 /// HUD 半透明浮层容器（rgba(30,30,32,.72)、圆角 9–10）。
 class HudPanel extends StatelessWidget {
   const HudPanel({
@@ -160,7 +179,7 @@ class HudPanel extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: context.colors.hudOverlay,
+        color: context.hudOverlay,
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: DefaultTextStyle.merge(

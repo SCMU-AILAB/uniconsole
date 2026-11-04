@@ -23,6 +23,7 @@ class AppShell extends StatelessWidget {
     this.user,
     this.onUserSettings,
     this.immersive = false,
+    this.sidebarIconSize = AppSizes.icon,
   });
 
   final Widget child;
@@ -37,6 +38,7 @@ class AppShell extends StatelessWidget {
 
   /// 移动端全屏（横屏操控）：不显示标签栏。
   final bool immersive;
+  final double sidebarIconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +103,7 @@ class AppShell extends StatelessWidget {
                 onSelect: onSidebarSelect,
                 user: user,
                 onUserSettings: onUserSettings,
+                iconSize: sidebarIconSize,
               ),
               Expanded(child: child),
             ],

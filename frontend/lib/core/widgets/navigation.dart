@@ -61,7 +61,11 @@ class AppSidebar extends StatelessWidget {
     this.onUserSettings,
     this.compact = false,
     this.topInset = 0,
+    this.iconSize = AppSizes.icon,
   });
+
+  /// 导航图标大小（设置 › 外观 › 侧边栏图标大小：15 / 17 / 20）。
+  final double iconSize;
 
   final List<SidebarSection> sections;
   final String? selectedId;
@@ -156,6 +160,7 @@ class AppSidebar extends StatelessWidget {
               item: item,
               selected: item.id == selectedId,
               compact: compact,
+              iconSize: iconSize,
               onTap: () => onSelect(item.id),
             ),
           ),
@@ -258,12 +263,14 @@ class _SidebarTile extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.compact,
+    required this.iconSize,
     required this.onTap,
   });
 
   final SidebarItem item;
   final bool selected;
   final bool compact;
+  final double iconSize;
   final VoidCallback onTap;
 
   @override
@@ -271,9 +278,13 @@ class _SidebarTile extends StatelessWidget {
     final c = context.colors;
     final t = context.type;
     final leading = item.icon != null
-        ? AppIcon(item.icon!, color: selected ? c.accent : c.secondaryLabel)
+        ? AppIcon(
+            item.icon!,
+            size: iconSize,
+            color: selected ? c.accent : c.secondaryLabel,
+          )
         : SizedBox(
-            width: AppSizes.icon,
+            width: iconSize,
             child: Center(
               child: StatusDot(
                 StatusTone.offline,
