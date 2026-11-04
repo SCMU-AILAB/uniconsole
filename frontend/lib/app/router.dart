@@ -2,11 +2,10 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/layout/app_route_page.dart';
-import '../core/widgets/widgets.dart';
 import '../core/theme/theme.dart';
+import '../features/agent/agent_page.dart';
 import '../features/alerts/alert_detail_page.dart';
 import '../features/alerts/alerts_page.dart';
-import '../features/common/placeholder_page.dart';
 import '../features/control/control_page.dart';
 import '../features/devices/device_detail_page.dart';
 import '../features/devices/devices_page.dart';
@@ -14,6 +13,7 @@ import '../features/fleet/fleet_page.dart';
 import '../features/gallery/gallery_page.dart';
 import '../features/leases/leases_page.dart';
 import '../features/maintenance/maintenance_page.dart';
+import '../features/members/members_page.dart';
 import '../features/me/me_page.dart';
 import '../features/replay/replay_page.dart';
 import '../features/missions/missions_page.dart';
@@ -30,32 +30,6 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
     key: state.pageKey,
     push: state.extra == NavIntent.push,
     child: child,
-  );
-
-  GoRoute placeholder(
-    String path, {
-    required String title,
-    String? mobileTitle,
-    required AppIcons icon,
-    required String design,
-    required int phase,
-    String? inspector,
-    List<RouteBase> routes = const [],
-  }) => GoRoute(
-    path: path,
-    pageBuilder: (context, state) => page(
-      state,
-      PlaceholderPage(
-        title: title,
-        mobileTitle: mobileTitle,
-        icon: icon,
-        design: design,
-        phase: phase,
-        params: state.pathParameters,
-        inspectorTitle: inspector,
-      ),
-    ),
-    routes: routes,
   );
 
   return GoRouter(
@@ -171,20 +145,16 @@ GoRouter buildRouter({String initialLocation = Routes.devices}) {
             path: Routes.leases,
             pageBuilder: (context, state) => page(state, const LeasesPage()),
           ),
-          placeholder(
-            '/members',
-            title: '成员与权限',
-            icon: AppIcons.members,
-            design: 'Roles.dc.html',
-            phase: 6,
+          GoRoute(
+            path: Routes.members,
+            pageBuilder: (context, state) => page(state, const MembersPage()),
           ),
-          placeholder(
-            '/agent',
-            title: '智能体与对讲',
-            mobileTitle: '智能体',
-            icon: AppIcons.agent,
-            design: 'Agent.dc.html · MobileAgent.dc.html',
-            phase: 6,
+          GoRoute(
+            path: Routes.agent,
+            pageBuilder: (context, state) => page(
+              state,
+              AgentPage(talk: state.uri.queryParameters['mode'] == 'talk'),
+            ),
           ),
           GoRoute(
             path: Routes.settings,

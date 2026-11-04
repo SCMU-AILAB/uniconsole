@@ -271,6 +271,7 @@ class InsetGroupedSection extends StatelessWidget {
     required this.children,
     this.footer,
     this.dividerIndent = 14,
+    this.background,
   });
 
   final String? header;
@@ -279,6 +280,9 @@ class InsetGroupedSection extends StatelessWidget {
 
   /// 分割线左缩进（有图标时与文字对齐）。
   final double dividerIndent;
+
+  /// 默认 surface；放在白底页面上时用 fillSecondary（MobileAgent 对讲设置）。
+  final Color? background;
 
   @override
   Widget build(BuildContext context) {
@@ -305,7 +309,7 @@ class InsetGroupedSection extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.tile),
             child: ColoredBox(
-              color: c.surface,
+              color: background ?? c.surface,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: _withDividers(

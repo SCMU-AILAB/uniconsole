@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uniconsole/app/destinations.dart';
 import 'package:uniconsole/core/theme/theme.dart';
 import 'package:uniconsole/core/widgets/widgets.dart';
+import 'package:uniconsole/features/members/members_page.dart';
 import 'package:uniconsole/features/devices/devices_page.dart';
 import 'package:uniconsole/main.dart';
 
@@ -84,7 +85,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 16));
     expect(find.byType(DevicesPage), findsNothing);
-    expect(find.text('「成员与权限」将在第 6 阶段实现'), findsOneWidget);
+    expect(find.byType(MembersPage), findsOneWidget);
   });
 
   testWidgets('层级进入（push）以 iOS 推入动画滑入', (tester) async {
@@ -92,9 +93,9 @@ void main() {
     await tester.tap(find.text('成员与权限'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
-    final mid = tester.getTopLeft(find.text('「成员与权限」将在第 6 阶段实现')).dx;
+    final mid = tester.getTopLeft(find.byType(MembersPage)).dx;
     await tester.pumpAndSettle();
-    final end = tester.getTopLeft(find.text('「成员与权限」将在第 6 阶段实现')).dx;
+    final end = tester.getTopLeft(find.byType(MembersPage)).dx;
     expect(mid, greaterThan(end + 20), reason: '推入过程中页面应在右侧滑入');
     // 返回按钮出现。
     expect(find.bySemanticsLabel('返回'), findsOneWidget);

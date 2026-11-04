@@ -51,13 +51,18 @@ class AppShell extends StatelessWidget {
 
     if (size.isMobile) {
       // macOS 窗口拉窄到移动布局时，把标题栏高度当作顶部安全区，避开红黄绿按钮。
-      final mq = MediaQuery.of(context);
-      final padded = mq.padding.top >= band
-          ? child
-          : MediaQuery(
-              data: mq.copyWith(padding: mq.padding.copyWith(top: band)),
-              child: child,
-            );
+      // 必须读 Scaffold 内部的 MediaQuery：那里的底部内边距包含了标签栏高度
+      // （extendBody），用外层的会把它覆盖成 0，内容被标签栏挡住。
+      final padded = Builder(
+        builder: (context) {
+          final mq = MediaQuery.of(context);
+          if (mq.padding.top >= band) return child;
+          return MediaQuery(
+            data: mq.copyWith(padding: mq.padding.copyWith(top: band)),
+            child: child,
+          );
+        },
+      );
       return Scaffold(
         backgroundColor: c.mobileBackground,
         // 内容延伸到半透明标签栏下方；页面按 MediaQuery 底部内边距留白。

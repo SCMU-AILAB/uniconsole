@@ -469,9 +469,12 @@ class MockAgentRepository implements AgentRepository {
   List<AgentStep> _startStep(List<AgentStep> steps, int i) => [
     for (final (j, s) in steps.indexed)
       j < i
-          ? s.copyWith(state: StepState.done)
+          ? s.copyWith(state: AgentStepState.done)
           : j == i
-          ? s.copyWith(state: StepState.running, summary: _runningSummary(s))
+          ? s.copyWith(
+              state: AgentStepState.running,
+              summary: _runningSummary(s),
+            )
           : s,
   ];
 
@@ -608,7 +611,7 @@ class MockAgentRepository implements AgentRepository {
         steps: [
           for (final s in p.steps)
             s.copyWith(
-              state: StepState.done,
+              state: AgentStepState.done,
               summary: s.call.startsWith('after(')
                   ? '已排队：任务结束后自动回桩'
                   : s.summary?.startsWith('返回中') ?? false
@@ -654,9 +657,9 @@ class MockAgentRepository implements AgentRepository {
         state: PlanState.aborted,
         steps: [
           for (final s in p.steps)
-            s.state == StepState.done
+            s.state == AgentStepState.done
                 ? s
-                : s.copyWith(state: StepState.skipped),
+                : s.copyWith(state: AgentStepState.skipped),
         ],
         progress: '已中止，${p.deviceIds.length} 台设备已停止',
       ),

@@ -67,6 +67,7 @@ class AppAlert<T> extends StatelessWidget {
     this.content,
     required this.actions,
     this.primaryEnabled = true,
+    this.maxWidth,
   });
 
   final String title;
@@ -76,6 +77,9 @@ class AppAlert<T> extends StatelessWidget {
 
   /// 主操作是否可用（如必填原因为空时禁用）。
   final bool primaryEnabled;
+
+  /// 默认桌面 340、移动 300；表单较宽时放大。
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +128,9 @@ class AppAlert<T> extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.x6),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: mobile ? 300 : 340),
+            constraints: BoxConstraints(
+              maxWidth: maxWidth ?? (mobile ? 300 : 340),
+            ),
             child: Semantics(
               scopesRoute: true,
               namesRoute: true,
@@ -170,7 +176,8 @@ class AppAlert<T> extends StatelessWidget {
                       ],
                       if (content != null) ...[
                         const SizedBox(height: AppSpacing.x4),
-                        content!,
+                        // 内容超出屏幕高度时在提示框内滚动，按钮行始终可见。
+                        Flexible(child: SingleChildScrollView(child: content!)),
                       ],
                       const SizedBox(height: AppSpacing.x5),
                       Row(

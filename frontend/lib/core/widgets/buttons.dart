@@ -24,7 +24,7 @@ enum ButtonSize {
   final double iconSize;
 }
 
-enum _Variant { primary, secondary, tinted, destructive }
+enum _Variant { primary, secondary, tinted, destructive, destructiveFilled }
 
 class _AppButton extends StatelessWidget {
   const _AppButton({
@@ -69,6 +69,12 @@ class _AppButton extends StatelessWidget {
         s.critical.fg,
         null,
         FontWeight.w500,
+      ),
+      _Variant.destructiveFilled => (
+        c.emergency,
+        c.onAccent,
+        null,
+        FontWeight.w600,
       ),
     };
     final textStyle = (size == ButtonSize.small ? t.subhead : t.body).copyWith(
@@ -197,6 +203,7 @@ class SecondaryButton extends StatelessWidget {
 }
 
 /// 危险操作：严重色浅底 + 深红字（如「远程趴下」「强制收回」）。
+/// [filled] 为红色实底白字（Agent.dc.html「中止并停止所有设备」）。
 class DestructiveButton extends StatelessWidget {
   const DestructiveButton({
     super.key,
@@ -205,6 +212,7 @@ class DestructiveButton extends StatelessWidget {
     this.icon,
     this.size = ButtonSize.small,
     this.expand = false,
+    this.filled = false,
   });
 
   final String label;
@@ -212,10 +220,11 @@ class DestructiveButton extends StatelessWidget {
   final AppIcons? icon;
   final ButtonSize size;
   final bool expand;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) => _AppButton(
-    variant: _Variant.destructive,
+    variant: filled ? _Variant.destructiveFilled : _Variant.destructive,
     label: label,
     onPressed: onPressed,
     icon: icon,

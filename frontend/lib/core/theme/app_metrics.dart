@@ -26,6 +26,11 @@ abstract final class AppRadius {
 
   /// 小标签（Tag）
   static const double tag = 5;
+
+  /// 对话气泡（Agent.dc.html 16，MobileAgent.dc.html 18）与气泡尾角 4。
+  static const double bubble = 16;
+  static const double bubbleMobile = 18;
+  static const double bubbleTail = 4;
 }
 
 /// 间距：4pt 网格（HANDOFF.md §13）。所有内外边距与间隔都必须取自这里。

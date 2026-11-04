@@ -15,7 +15,7 @@ enum PlanState {
   bool get finished => this == done || this == aborted || this == cancelled;
 }
 
-enum StepState { waiting, running, done, skipped }
+enum AgentStepState { waiting, running, done, skipped }
 
 /// 计划的一步：哪台设备、做什么、对应的技能调用、预计耗时。
 @immutable
@@ -27,7 +27,7 @@ class AgentStep {
     this.deviceId,
     this.eta,
     this.summary,
-    this.state = StepState.waiting,
+    this.state = AgentStepState.waiting,
   });
 
   /// 设备名或「系统」。
@@ -43,9 +43,9 @@ class AgentStep {
 
   /// 手机上一行显示的短说明（MobileAgent rows[].note），执行中会更新。
   final String? summary;
-  final StepState state;
+  final AgentStepState state;
 
-  AgentStep copyWith({StepState? state, String? summary}) => AgentStep(
+  AgentStep copyWith({AgentStepState? state, String? summary}) => AgentStep(
     who: who,
     deviceId: deviceId,
     text: text,
@@ -88,7 +88,7 @@ class AgentPlan {
 
   /// 当前步骤（0 起）；没有在执行的步骤时为 null。
   int? get current {
-    final i = steps.indexWhere((s) => s.state == StepState.running);
+    final i = steps.indexWhere((s) => s.state == AgentStepState.running);
     return i < 0 ? null : i;
   }
 
