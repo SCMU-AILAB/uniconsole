@@ -350,22 +350,33 @@ class PermissionMatrixCard extends ConsumerWidget {
       ],
     );
 
+    // 手机上图例放在标题下方，避免和标题挤在一行。
+    final narrow = LayoutSize.ofContext(context).isMobile;
+    final legend = Text(
+      [for (final a in Access.values) '${a.symbol} ${a.label}'].join('　'),
+      textAlign: narrow ? TextAlign.start : TextAlign.end,
+      style: t.footnote.copyWith(color: c.secondaryLabel),
+    );
+
     return AppCard(
       title: '角色权限',
       semanticLabel: '角色权限矩阵',
-      trailing: Flexible(
-        child: Text(
-          [for (final a in Access.values) '${a.symbol} ${a.label}'].join('　'),
-          textAlign: TextAlign.end,
-          style: t.footnote.copyWith(color: c.secondaryLabel),
-        ),
-      ),
+      trailing: narrow ? null : Flexible(child: legend),
       child: LayoutBuilder(
         builder: (context, box) {
           if (box.maxWidth >= 560) return table;
-          return SingleChildScrollView(
+          final scroller = SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SizedBox(width: 560, child: table),
+          );
+          if (!narrow) return scroller;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              legend,
+              const SizedBox(height: AppSpacing.x2),
+              scroller,
+            ],
           );
         },
       ),

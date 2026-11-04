@@ -44,21 +44,24 @@ class SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.type;
+    // 手机上类别名已经是导航栏标题，不再重复。
+    final mobile = LayoutSize.ofContext(context).isMobile;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.x1,
-            0,
-            AppSpacing.x1,
-            AppSpacing.x2,
+        if (!mobile)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.x1,
+              0,
+              AppSpacing.x1,
+              AppSpacing.x2,
+            ),
+            child: Semantics(
+              header: true,
+              child: Text(title, style: t.cardTitle.copyWith(color: c.label)),
+            ),
           ),
-          child: Semantics(
-            header: true,
-            child: Text(title, style: t.cardTitle.copyWith(color: c.label)),
-          ),
-        ),
         for (final (i, w) in children.indexed) ...[
           if (i > 0) const SizedBox(height: AppSpacing.x2),
           w,
