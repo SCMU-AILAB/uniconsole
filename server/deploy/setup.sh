@@ -73,7 +73,7 @@ sudo systemctl enable uniconsole-server >/dev/null
 sudo systemctl restart uniconsole-server
 
 for _ in $(seq 1 30); do
-  curl -sf "http://127.0.0.1:${PORT}/healthz" && echo && break
+  curl --noproxy "*" -sf "http://127.0.0.1:${PORT}/healthz" && echo && break
   sleep 1
 done
 systemctl --no-pager --lines=5 status uniconsole-server | head -12

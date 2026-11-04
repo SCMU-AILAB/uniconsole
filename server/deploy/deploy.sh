@@ -21,5 +21,5 @@ if [[ "${2:-}" == "--setup" ]]; then
 else
   ssh "$HOST" "cd $REMOTE_DIR && ~/.cargo/bin/cargo build --release -p uniconsole-server \
     && sudo systemctl restart uniconsole-server \
-    && for i in \$(seq 1 30); do curl -sf http://127.0.0.1:\$(grep -oP '(?<=BIND_ADDR=0.0.0.0:)\d+' .env)/healthz && echo && break; sleep 1; done"
+    && for i in \$(seq 1 30); do curl --noproxy '*' -sf http://127.0.0.1:\$(grep -oP '(?<=BIND_ADDR=0.0.0.0:)\d+' .env)/healthz && echo && break; sleep 1; done"
 fi
