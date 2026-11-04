@@ -250,31 +250,56 @@ Lease = {
 
 ### 多机联调（Fleet.dc.html）
 
+```json
+FleetSession = {
+  "id": "uuid", "number": 12, "title": "展厅迎宾",          // 界面显示「联调会话 #12」
+  "initiator_id": "…", "started_at": "… | null",
+  "device_ids": ["go2-05", "go2-06"], "leader_id": "go2-05",  // 第一台是领队
+  "formation": "line|column|v|grid", "spacing": 1.2, "preset_id": "… | null",
+  "control_mode": "领队-跟随", "clock_sync": "PTP · 局域网", "lost_link_action": "原地趴下",
+  "clock_skew_ms": null,                                      // 未接入 PTP 统计前为 null
+  "timeline": [{"device_id": "go2-05", "start_ms": 0, "end_ms": 2000, "action": "stand", "kind": "pose|move|act"}],
+  "timeline_length_ms": 16000,                                // 服务端按 timeline 的最大 end_ms 计算
+  "last_receipt": Receipt | null,
+  "active": true, "paused": false, "created_at": "…", "updated_at": "…"
+}
+Receipt = {"label": "同步站立", "sent_at": "…", "schedule_offset_ms": 200,
+           "acks": [{"device_id": "go2-05", "ok": true, "latency_ms": 22, "error": null, "message": null}]}
+```
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET / POST | /fleet-sessions | `{name?, device_ids?, leader_id?, formation?, spacing?, timeline?}` |
-| GET / PATCH / DELETE | /fleet-sessions/{id} | |
-| POST | /fleet-sessions/{id}/start | 一次性获取所有设备租约（任一被占用则整体失败 409） |
-| POST | /fleet-sessions/{id}/stop | 全部停止并释放租约 |
-| POST | /fleet-sessions/{id}/commands | `{command, device_ids?}` → 每台设备的 `{device_id, ok, error}` |
+| GET | /fleet-sessions?active= | 列表（进行中的在前） |
+| POST | /fleet-sessions?start=true | `{title, device_ids, formation?, spacing?, timeline?, preset_id?, control_mode?, clock_sync?, lost_link_action?}`；带 `preset_id` 时缺省字段取自预设。`start=true` 直接开始：任一设备被占用则整体失败（409 + `device_ids`），会话不会留下 |
+| GET / PATCH / DELETE | /fleet-sessions/{id} | PATCH 字段同上，另有 `paused: false`（急停解除后恢复） |
+| POST | /fleet-sessions/{id}/start | 开始：一次性接管所有设备的控制权 |
+| POST | /fleet-sessions/{id}/stop | 结束：全部停止并释放控制权 |
+| POST | /fleet-sessions/{id}/commands | `{command, device_ids?, label?}` → `Receipt`（同时存为 `last_receipt`） |
+| GET | /fleet-presets | `[{id, name, device_ids, formation, spacing, created_by, created_at}]` |
+| POST | /fleet-presets | `{name, session_id}`（把会话保存为预设）或 `{name, device_ids, formation?, spacing?}` |
+| DELETE | /fleet-presets/{id} | |
 
-### 任务 / 安全 / 告警
+行为：
+- 进行中 `PATCH {device_ids}`：新加入的设备由会话接管控制权（被别人占用 → 409 + `device_ids`），移出的设备停止并释放；
+  **最后一台退出时会话自动结束**。只有发起人和平台管理员能操作会话（403）。
+- 全局急停时所有进行中的会话 `paused = true`，此时运动类同步指令 409；急停解除后需要 `PATCH {paused: false}` 恢复（急停中恢复 423）。
+- `schedule_offset_ms`：各设备在同一时刻执行时相对发出时刻的偏移，取最慢回执向上取整到 50 ms。
+- 变化推送 `changed: fleet_sessions` / `changed: fleet_presets`。
+- TODO：timeline 执行器、编队保持、PTP 时钟偏差统计（`clock_skew_ms`）。
+
+### 安全（Safety.dc.html）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET / POST | /missions | `{name, map_id, waypoints[], schedule?, assignee{}, state?}` |
-| GET / PATCH / DELETE | /missions/{id} | |
-| GET | /safety | `{global_estop, estop_by, estop_at, active_zones, policies}`，policies 见下 |
-| PATCH | /safety/policies | 局部更新策略字段（未知字段、非法取值 400） |
-| POST | /safety/estop | `{active}` 全局急停（任何人可触发；默认解除需管理者） |
-| GET / POST | /zones?map_id= | `{map_id, name, zone_type, polygon: [[x,y],…], rule?, scope?, schedule?, action?}` |
-| PATCH / DELETE | /zones/{id} | |
-| GET | /alerts?state=&severity=&device_id=&limit= | |
-| GET | /alerts/{id} | `{alert, events[]}`（事件时间线） |
-| PATCH | /alerts/{id} | `{state: open|doing|closed, note?}` |
-| POST | /alerts/{id}/events | `{message}` 备注 |
-| GET / POST | /alert-rules | `{name, metric, op: > < >= <=, threshold, duration_secs, severity, auto_action?: slow|stop}` |
-| PATCH / DELETE | /alert-rules/{id} | |
+| GET | /safety | `{global_estop, estop_by, estop_at, last_drill_at, active_zones, policies}`；`estop_by` 是显示名，未急停时为 null |
+| PATCH | /safety/policies | 局部更新策略字段（未知字段、非法取值 400）；管理员 / 设备管理者 |
+| POST | /safety/estop | `{active}` 全局急停（任何人可触发；`release_needs_manager` 时非管理者解除 403「需要管理者解除」） |
+| POST | /safety/drill | 急停演练（管理员 / 设备管理者）→ `{at, responses: [{device_id, ok, ms, error, message}]}`；设备不会真的停机，完成后更新 `last_drill_at` |
+| GET / POST | /zones?map_id= | `{map_id, name, zone_type, polygon: [[x,y],…], rule?, scope?, schedule?, action?, enabled?}` |
+| PATCH / DELETE | /zones/{id} | 变化推送 `changed: zones` |
+
+围栏的 `rule` / `scope` / `schedule` / `action` 都是**显示文本**（如「限速 0.3 m/s」「全部设备」「全天」「停止并告警」），
+`scope` 默认「全部设备」、`schedule` 默认「全天」。`polygon` 用地图坐标系（米，见「约定」）。
 
 安全策略 `policies`（字段名与前端 `SafetyPolicies` 一致）：
 
@@ -294,8 +319,63 @@ Lease = {
 - `idle_release_secs`：持有者多久没有任何操作（指令 / 续约）自动释放，0 表示不释放。
 - `release_needs_manager` 为 true 时，非管理者解除急停 403「需要管理者解除」。
 
-告警规则可用的 `metric`：`max_motor_temp`、`battery`、`latency_ms`、`voltage`、`pitch`、`roll`，
+### 告警（Alerts.dc.html）
+
+```json
+Alert = {
+  "id": "uuid", "severity": "critical|warning|info", "state": "open|doing|closed",
+  "title": "电机过热", "device_id": "go2-03", "rule_id": "… | null",
+  "metric": "max_motor_temp", "metric_label": "电机最高温度（°C）", "threshold": 60, "peak": 68,
+  "location": "C 区 · 仓库",            // 触发时设备的位置
+  "assignee_id": "… | null",           // 处理人
+  "silenced_until": "… | null",
+  "recording_id": null,                // 自动录制，尚未实现
+  "created_at": "…", "updated_at": "…", "closed_at": "… | null"
+}
+AlertEvent = {"id": 1, "alert_id": "…", "at": "…", "tone": "critical|warning|neutral|info", "level": "…",
+              "message": "电机最高温度（°C） > 60 持续 10 秒（当前 68.0）", "actor_id": "… | null"}
+```
+
+`tone`：`critical` / `warning` = 触发，`neutral` = 自动动作和通知，`info` = 人工处理。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | /alerts?state=&severity=&device_id=&assignee_id=&limit= | `Alert[]`（按可见设备过滤） |
+| GET | /alerts/{id} | `{alert, events[]}`（时间线按时间升序） |
+| PATCH | /alerts/{id} | 见下 |
+| POST | /alerts/{id}/events | `{message}` 备注 |
+| POST | /alerts/{id}/remote-down | 走急停通道让设备趴下：不需要控制权、急停中也可以 → `CommandResult`；写时间线和审计 |
+| GET | /alerts/{id}/history | 指标曲线 `{metric, metric_label, threshold, from, to, min_y, max_y, values: [{ts, v}]}`：触发前 30 分钟到关闭（或现在，最多触发后 2 小时） |
+| GET / POST | /alert-rules | `{name, metric, metric_label?, op: > < >= <=, threshold, duration_secs, severity, auto_action?, enabled?}` |
+| PATCH / DELETE | /alert-rules/{id} | `PATCH {enabled}` 用于开关；`auto_action: null` 清除；变化推送 `changed: alert_rules` |
+| GET / PUT | /alert-channels | `[{name, min_severity}]`（PUT 仅管理员）；实际发送尚未接入 |
+| GET / PUT | /on-call | `{weeks: [成员 id], escalate_after_secs, escalate_to_id}`，`weeks[0]` 是本周值班人（PUT 仅管理员） |
+
+`PATCH /alerts/{id}` 的操作（观察者 403）：
+
+| 前端操作 | 请求 | 说明 |
+|---|---|---|
+| 确认 | `{state: "doing"}` | 尚无处理人时当前用户成为处理人 |
+| 指派 | `{assignee_id}` | 状态同时变为 doing；通知被指派人 |
+| 关闭 | `{state: "closed", note}` | `note` 必填（400「关闭告警需要填写处理说明」） |
+| 重新打开 | `{state: "open"}` | |
+| 静默 | `{silenced_until: "…"}` / `{silenced_until: null}` | 只记录，不影响去重 |
+
+每个操作都写时间线（tone `info`）和审计（如「确认告警「Charlie 电机过热」」）。告警新建和状态变化都推 WS `alert`
+（前端收到后 `GET /alerts/{id}` 拿完整数据）以及 `changed: alerts`。
+
+`auto_action`：`slow` 自动降速 · `stop` 自动停止 · `dock` 自动回桩（发送 `dock` 技能，机器人端需支持）·
+`notify` 通知设备管理者和平台管理员（WS `notice`）。规则表单显示的「> 60 °C 持续 10 秒」由前端用 `op` / `threshold` / `duration_secs` 拼出。
+
+告警规则可用的 `metric`：`max_motor_temp`、`battery`、`latency_ms`、`voltage`、`current`、`pitch`、`roll`，
 以及遥测 `extra` 中的任意数值字段（如 `loc_confidence`）。
+
+### 地图与任务（Missions.dc.html）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET / POST | /missions | `{name, map_id, waypoints[], schedule?, assignee{}, state?}` |
+| GET / PATCH / DELETE | /missions/{id} | |
 
 ### 系统
 
@@ -362,6 +442,11 @@ Lease = {
 | `leases` | `GET /leases`（同时也会推 `lease_changed`） |
 | `safety` | `GET /safety`（急停、策略、演练） |
 | `fleet_sessions` | `GET /fleet-sessions` |
+| `fleet_presets` | `GET /fleet-presets` |
+| `zones` | `GET /zones` |
+| `alerts` | `GET /alerts`（单条用 `id`） |
+| `alert_rules` | `GET /alert-rules` |
+| `alert_channels` / `on_call` | `GET /alert-channels` / `GET /on-call` |
 
 ---
 

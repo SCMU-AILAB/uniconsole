@@ -7,3 +7,4 @@ pub mod leases;
 pub mod members;
 pub mod safety;
 pub mod sessions;
+pub mod settings;

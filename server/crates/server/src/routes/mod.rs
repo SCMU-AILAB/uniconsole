@@ -112,6 +112,11 @@ pub fn router(state: AppState) -> Router {
         .route("/fleet-sessions/{id}/start", post(fleet::start))
         .route("/fleet-sessions/{id}/stop", post(fleet::stop))
         .route("/fleet-sessions/{id}/commands", post(fleet::command))
+        .route(
+            "/fleet-presets",
+            get(fleet::list_presets).post(fleet::create_preset),
+        )
+        .route("/fleet-presets/{id}", delete(fleet::delete_preset))
         // 地图与任务（Missions.dc.html）
         .route("/missions", get(missions::list).post(missions::create))
         .route(
@@ -124,6 +129,7 @@ pub fn router(state: AppState) -> Router {
         .route("/safety", get(safety::get))
         .route("/safety/policies", patch(safety::update_policies))
         .route("/safety/estop", post(safety::global_estop))
+        .route("/safety/drill", post(safety::drill))
         .route("/zones", get(safety::list_zones).post(safety::create_zone))
         .route(
             "/zones/{id}",
@@ -133,6 +139,16 @@ pub fn router(state: AppState) -> Router {
         .route("/alerts", get(alerts::list))
         .route("/alerts/{id}", get(alerts::get).patch(alerts::update))
         .route("/alerts/{id}/events", post(alerts::add_note))
+        .route("/alerts/{id}/remote-down", post(alerts::remote_down))
+        .route("/alerts/{id}/history", get(alerts::history))
+        .route(
+            "/alert-channels",
+            get(alerts::get_channels).put(alerts::put_channels),
+        )
+        .route(
+            "/on-call",
+            get(alerts::get_on_call).put(alerts::put_on_call),
+        )
         .route(
             "/alert-rules",
             get(alerts::list_rules).post(alerts::create_rule),

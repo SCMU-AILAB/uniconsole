@@ -272,20 +272,106 @@ pub struct LeaseRequest {
 
 // ───────────── 联调 ─────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct FleetSession {
     pub id: Uuid,
+    pub number: i32,
     pub name: String,
     pub owner_id: Uuid,
+    /// 第一台是领队
     pub device_ids: Vec<String>,
-    pub leader_id: Option<String>,
     pub formation: Formation,
     pub spacing: f32,
+    pub preset_id: Option<String>,
+    pub control_mode: String,
+    pub clock_sync: String,
+    pub lost_link_action: String,
+    /// TrackAction[]：{device_id, start_ms, end_ms, action, kind: pose|move|act}
     pub timeline: Value,
+    pub last_receipt: Option<Value>,
     pub active: bool,
+    pub paused: bool,
+    pub started_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// 对外形状（前端 FleetSession）
+impl Serialize for FleetSession {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        struct Out<'a> {
+            id: Uuid,
+            number: i32,
+            title: &'a str,
+            initiator_id: Uuid,
+            started_at: Option<DateTime<Utc>>,
+            device_ids: &'a [String],
+            leader_id: Option<&'a String>,
+            formation: Formation,
+            spacing: f32,
+            preset_id: Option<&'a str>,
+            control_mode: &'a str,
+            clock_sync: &'a str,
+            lost_link_action: &'a str,
+            /// 时钟偏差：未接入 PTP 统计前为 null
+            clock_skew_ms: Option<i64>,
+            timeline: &'a Value,
+            timeline_length_ms: i64,
+            last_receipt: Option<&'a Value>,
+            active: bool,
+            paused: bool,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
+        }
+        let length = self
+            .timeline
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|t| t.get("end_ms").and_then(Value::as_i64))
+                    .max()
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0);
+        Out {
+            id: self.id,
+            number: self.number,
+            title: &self.name,
+            initiator_id: self.owner_id,
+            started_at: self.started_at,
+            device_ids: &self.device_ids,
+            leader_id: self.device_ids.first(),
+            formation: self.formation,
+            spacing: self.spacing,
+            preset_id: self.preset_id.as_deref(),
+            control_mode: &self.control_mode,
+            clock_sync: &self.clock_sync,
+            lost_link_action: &self.lost_link_action,
+            clock_skew_ms: None,
+            timeline: &self.timeline,
+            timeline_length_ms: length,
+            last_receipt: self.last_receipt.as_ref(),
+            active: self.active,
+            paused: self.paused,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+        .serialize(s)
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct FleetPreset {
+    pub id: String,
+    pub name: String,
+    pub device_ids: Vec<String>,
+    pub formation: Formation,
+    pub spacing: f32,
+    pub created_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
 }
 
 // ───────────── 任务 ─────────────
@@ -316,8 +402,19 @@ pub struct Alert {
     pub title: String,
     pub device_id: Option<String>,
     pub rule_id: Option<Uuid>,
+    /// 触发的指标，如 max_motor_temp；机器人事件时为事件 code
     pub metric: Option<String>,
+    /// 曲线标题，如「电机最高温度（°C）」
+    pub metric_label: Option<String>,
+    pub threshold: Option<f64>,
     pub peak: Option<f64>,
+    /// 触发位置，如「C 区仓库」
+    pub location: Option<String>,
+    /// 处理人
+    pub assignee_id: Option<Uuid>,
+    pub silenced_until: Option<DateTime<Utc>>,
+    /// 自动录制（告警前后 60 秒）
+    pub recording_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub closed_at: Option<DateTime<Utc>>,
@@ -328,8 +425,11 @@ pub struct Alert {
 pub struct AlertEvent {
     pub id: i64,
     pub alert_id: Uuid,
+    #[serde(rename = "at")]
     pub ts: DateTime<Utc>,
     pub level: String,
+    /// critical / warning = 触发，neutral = 自动动作与通知，info = 人工处理
+    pub tone: String,
     pub message: String,
     pub actor_id: Option<Uuid>,
 }
@@ -340,10 +440,12 @@ pub struct AlertRule {
     pub id: Uuid,
     pub name: String,
     pub metric: String,
+    pub metric_label: Option<String>,
     pub op: String,
     pub threshold: f64,
     pub duration_secs: i32,
     pub severity: AlertSeverity,
+    /// slow | stop | dock | notify
     pub auto_action: Option<String>,
     pub enabled: bool,
     pub created_at: DateTime<Utc>,
