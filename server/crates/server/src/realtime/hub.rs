@@ -5,6 +5,7 @@
 
 use std::{sync::Arc, time::Duration};
 
+use axum::body::Bytes;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -46,6 +47,8 @@ pub struct Hub {
     /// 成员 id → 在线前端连接数
     users: DashMap<Uuid, usize>,
     events: broadcast::Sender<Arc<ServerEvent>>,
+    /// 点云二进制帧：(设备 id, 机器人原始帧)
+    pointcloud: broadcast::Sender<Arc<(String, Bytes)>>,
 }
 
 impl Default for Hub {
@@ -57,6 +60,7 @@ impl Default for Hub {
 impl Hub {
     pub fn new() -> Self {
         let (events, _) = broadcast::channel(EVENT_BUS);
+        let (pointcloud, _) = broadcast::channel(256);
         Self {
             robots: DashMap::new(),
             live: DashMap::new(),
@@ -64,6 +68,7 @@ impl Hub {
             estopped: DashMap::new(),
             users: DashMap::new(),
             events,
+            pointcloud,
         }
     }
 
@@ -76,6 +81,16 @@ impl Hub {
     pub fn publish(&self, ev: ServerEvent) {
         // 没有订阅者时 send 返回 Err，可忽略
         let _ = self.events.send(Arc::new(ev));
+    }
+
+    pub fn subscribe_pointcloud(&self) -> broadcast::Receiver<Arc<(String, Bytes)>> {
+        self.pointcloud.subscribe()
+    }
+
+    pub fn publish_pointcloud(&self, device_id: &str, frame: Bytes) {
+        let _ = self
+            .pointcloud
+            .send(Arc::new((device_id.to_owned(), frame)));
     }
 
     // ───────── 机器人连接 ─────────

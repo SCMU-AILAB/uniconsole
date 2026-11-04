@@ -58,6 +58,7 @@ class Controller:
         self.max_yaw = settings.max_yaw_rate
         self._moving = False
         self._last_move = 0.0
+        self.lost_link_action = "stop"
 
     def apply_server_limits(self, max_speed: float, max_yaw: float) -> None:
         self.max_speed = min(self.settings.max_speed_mps, max_speed)
@@ -74,6 +75,9 @@ class Controller:
     async def handle(self, cmd) -> None:
         """执行一条指令；失败抛 CommandRejected / AdapterError。"""
         if isinstance(cmd, EstopCmd):
+            if cmd.drill:
+                log.info("急停演练：链路正常（未驱动硬件）")
+                return
             await self.trigger_estop(source="server")
             return
         if isinstance(cmd, ReleaseEstopCmd):
@@ -131,13 +135,15 @@ class Controller:
                 )
 
     async def on_link_lost(self) -> None:
-        """与服务器断线：立即停止（Safety.dc.html「断联后动作：原地停止」）。"""
+        """与服务器断线：按服务器下发的策略处理（stop 原地停止 / down 趴下；dock 暂按 stop）。"""
         if self._moving:
-            log.warning("与服务器断线，停止运动")
+            log.warning("与服务器断线，停止运动（策略 %s）", self.lost_link_action)
         try:
             await self.stop()
+            if self.lost_link_action == "down" and not self.estop:
+                await self.backend.set_mode("down")
         except AdapterError:
-            log.exception("断线停止失败")
+            log.exception("断线处理失败")
 
     async def watchdog(self) -> None:
         period = self.settings.watchdog_ms / 1000.0

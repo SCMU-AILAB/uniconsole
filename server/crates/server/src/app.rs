@@ -18,13 +18,14 @@ use crate::{
     auth,
     config::Config,
     models::Role,
-    protocol::Command,
+    protocol::{Command, ServerEvent},
     realtime::{Hub, spawn_telemetry_writer},
     routes,
     services::{
         alerting::AlertEngine,
         audit,
         control::{self, Actor},
+        events,
         leases::LeaseService,
         safety::SafetyService,
         sessions::LoginLimiter,
@@ -53,9 +54,7 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
 
     let hub = Arc::new(Hub::new());
     Ok(AppState {
-        leases: Arc::new(
-            LeaseService::load(db.clone(), hub.clone(), cfg.lease_default_secs).await?,
-        ),
+        leases: Arc::new(LeaseService::load(db.clone(), hub.clone()).await?),
         safety: Arc::new(SafetyService::load(&db).await?),
         alerts: Arc::new(AlertEngine::load(&db).await?),
         telemetry_tx: spawn_telemetry_writer(db.clone()),
@@ -141,40 +140,77 @@ async fn bootstrap_admin(db: &PgPool, cfg: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 每秒清理过期租约；按策略对设备下发停止（Safety.dc.html「控制租约过期：停止并释放」）
+/// 每秒检查租约（Safety.dc.html）：
+/// - 过期：`stop_release` 停止并释放；`stop_only` 只停止，持有者可续回，其他人也可直接申请
+/// - 空闲：持有者超过 `idle_release_secs` 没有任何操作则释放
 async fn lease_sweeper(st: AppState) {
     let mut tick = tokio::time::interval(Duration::from_secs(1));
     loop {
         tick.tick().await;
-        let expired = match st.leases.sweep_expired().await {
-            Ok(e) => e,
-            Err(e) => {
-                tracing::error!(error = %e, "清理过期租约失败");
-                continue;
+        let p = st.safety.policies();
+        let release = p.lease_expiry_action == "stop_release";
+        match st.leases.sweep_expired(release).await {
+            Ok(expired) => {
+                for lease in expired {
+                    lease_ended(
+                        &st,
+                        &lease,
+                        if release {
+                            "控制权到期，已停止并释放"
+                        } else {
+                            "控制权到期，已停止"
+                        },
+                    )
+                    .await;
+                }
             }
-        };
-        let stop = st.safety.policies().lease_expire_action.starts_with("stop");
-        for lease in expired {
-            if stop {
-                let _ = control::execute(
-                    &st,
-                    Actor::System("租约过期"),
-                    &lease.device_id,
-                    Command::Stop,
-                    false,
-                )
-                .await;
+            Err(e) => tracing::error!(error = %e, "检查过期租约失败"),
+        }
+        if p.idle_release_secs > 0 {
+            match st
+                .leases
+                .sweep_idle(Duration::from_secs(p.idle_release_secs as u64))
+                .await
+            {
+                Ok(idle) => {
+                    for lease in idle {
+                        let text =
+                            format!("持有者 {} 秒无操作，自动释放控制权", p.idle_release_secs);
+                        lease_ended(&st, &lease, &text).await;
+                    }
+                }
+                Err(e) => tracing::error!(error = %e, "检查空闲租约失败"),
             }
-            audit::record_system(
-                &st,
-                audit::Kind::System,
-                "控制权过期释放",
-                &lease.device_id,
-                json!({ "holder": lease.holder_id }),
-            )
-            .await;
         }
     }
+}
+
+async fn lease_ended(st: &AppState, lease: &crate::models::Lease, text: &str) {
+    let _ = control::execute(
+        st,
+        Actor::System("租约到期"),
+        &lease.device_id,
+        Command::Stop,
+        false,
+    )
+    .await;
+    let label = audit::device_label(st, &lease.device_id).await;
+    events::record(st, &lease.device_id, text, "warning").await;
+    if let Some(holder) = lease.holder_id {
+        st.hub.publish(ServerEvent::Notice {
+            member_id: holder,
+            level: "warning".into(),
+            text: format!("{label}：{text}"),
+        });
+    }
+    audit::record_system(
+        st,
+        audit::Kind::Control,
+        format!("{label} {text}"),
+        &label,
+        json!({ "holder": lease.holder() }),
+    )
+    .await;
 }
 
 async fn shutdown_signal() {

@@ -142,28 +142,53 @@ Member = {
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | /devices?status=&group=&q= | 设备列表（按可见范围过滤），见下方 DeviceView |
-| POST | /devices | 注册设备（管理员）→ `{device, token}`，**token 只返回这一次** |
-| GET / PATCH / DELETE | /devices/{id} | PATCH: `{name?, group?, location?, owner_id?, meta?}` |
+| GET | /devices?status=&group_id=&q= | 设备列表（按可见范围过滤），`DeviceView[]` |
+| POST | /devices | 注册设备（管理员）`{id, name, code, model, kind, sn?, group_id?, owner_id?, location?}` → `{device, token}`，**token 只返回这一次** |
+| GET / PATCH / DELETE | /devices/{id} | PATCH: `{name?, group_id?, location?, owner_id?, meta?}` |
 | POST | /devices/{id}/token | 轮换机器人接入令牌（管理员） |
-| GET | /devices/{id}/telemetry/latest | 最新一帧遥测 |
-| GET | /devices/{id}/telemetry?from=&to=&limit= | 抽样历史（默认最近 1 小时，1 Hz） |
-| POST | /devices/{id}/commands | `{command, wait?=true}` → `{cmd_id, ok, error}` |
-| GET | /devices/{id}/commands?limit= | 指令日志 |
-| POST | /devices/{id}/estop | `{active: bool}` 单机急停 / 解除 |
+| GET | /devices/{id}/telemetry/latest | 最新一帧遥测（形状同 WS `telemetry`） |
+| GET | /devices/{id}/telemetry?from=&to=&limit= | 1 Hz 抽样历史（默认最近 1 小时）→ `{"samples": [...]}`，见下 |
+| GET | /devices/{id}/sensors | 传感器描述（机器人 hello 上报），见下 |
+| GET | /devices/{id}/events?limit=20 | 最近事件 `[{at, text, tone}]`，增量走 WS `device_event` |
+| POST | /devices/{id}/commands | `{command, wait?=true}` → `CommandResult` |
+| GET | /devices/{id}/commands?limit= | 指令日志（含被拒绝的指令），见下 |
+| POST | /devices/{id}/estop | `{active: bool}` 单机急停 / 解除 → `{estop, delivered}`（离线也会记录，设备上线时生效） |
+| GET | /device-groups | `[{id, name, tone, sort}]`，`tone` 取 `online · busy · warning · action · critical · neutral` |
+| POST / PATCH / DELETE | /device-groups(/{id}) | `{id?, name, tone?, sort?}`（管理员 / 设备管理者）；变化推送 `changed: device_groups` |
 
 `DeviceView`（数据库字段 + 实时状态）：
 
 ```json
 {
   "id": "go2-01", "name": "Alpha", "code": "GO2-01", "model": "Unitree Go2 EDU", "kind": "dog",
-  "sn": "GO2E-24A0137", "firmware": "v1.1.7", "ip": "192.168.123.161", "group": "巡检队",
+  "sn": "GO2E-24A0137", "firmware": "v1.1.7", "ip": "192.168.123.161", "group_id": "patrol",
   "owner_id": "…", "status": "busy", "location": "B 区 · 2 号走廊", "current_task": "巡检路线 B-2",
-  "last_seen_at": "…", "meta": {}, "created_at": "…", "updated_at": "…",
-  "online": true, "battery": 86.0, "latency_ms": 18, "max_motor_temp": 46.0, "uptime_secs": 11520,
-  "estop": false,
-  "lease": { "holder_kind": "user", "holder_id": "…", "source": "单机操控", "expires_at": "…", … }
+  "last_seen_at": "…", "created_at": "…", "updated_at": "…",
+  "meta": {
+    "capabilities": ["move", "mode", "action", "skills", "telemetry"],
+    "skills": [{"name": "heart", "description": "…", "tags": [], "motion": true}],   // 动作按钮；motion=true 急停中禁用
+    "sensors": {…}
+  },
+  "online": true,
+  "battery": 86.0,          // 可为浮点；机器人拿不到时为 null；离线时保留最后已知值
+  "latency_ms": 18,         // 离线 null
+  "max_motor_temp": 46.0,   // 离线 null
+  "uptime_secs": 11520,     // 离线 null
+  "estop": false,           // 单机急停中（全局急停时也为 true）
+  "user_id": "…",           // 当前持有控制权的成员（lease.holder_kind == user 时），否则 null
+  "lease": Lease | null     // 形状见「控制权」，含 queue
 }
+```
+
+遥测历史 `samples[]`：`{ts, battery, max_motor_temp, latency_ms, voltage, current, pitch, roll, vx, extra}`，按时间升序。
+
+传感器：
+
+```json
+{"lidar": "4D LiDAR · 360°×90° · 21,600 点/秒 · 10 Hz",
+ "cameras": [{"name": "前置 RGB", "detail": "1280×720 · 30 fps", "health": "ok|degraded|idle", "hz": 30}],
+ "topics":  [{"name": "/utlidar/cloud", "detail": "PointCloud2", "health": "ok", "hz": 10}],
+ "online": true}
 ```
 
 `command`（`kind` 区分）：
@@ -174,20 +199,54 @@ Member = {
 {"kind": "set_mode", "mode": "stand|down|balance|walk|stairs|damp|recovery"}
 {"kind": "set_speed", "level": "slow|normal|fast"}  // 0.3 / 0.8 / 1.5 m/s
 {"kind": "estop"} / {"kind": "release_estop"}
-{"kind": "action", "name": "hello", "params": {}}
+{"kind": "action", "name": "heart", "params": {}}  // name 取自 meta.skills；参数校验由机器人端技能完成
 ```
+
+`CommandResult`：`{cmd_id, ok, error, message, latency_ms}`。`ok: false` 时 `error` 为 `robot_error`（机器人执行失败，
+`message` 是机器人给的原因）。被服务端拒绝的指令直接返回 HTTP 错误（403 / 423 / 503 / 504）。
+
+指令日志（新的在前）：
+
+```json
+[{"cmd_id": "…", "at": "…", "command": {"kind": "set_mode", "mode": "stand"},
+  "ok": false, "error": "estop_active", "message": "系统处于急停状态", "by": "Kanade", "acked_at": "…"}]
+```
+
+`error` 取值：`estop_active` · `forbidden` · `robot_offline` · `timeout` · `robot_error`，前端翻译成中文；`ok: null` 表示未等待回执。
+高频 `move` 不记录。
 
 ### 控制权（Lease.dc.html）
 
+```json
+Lease = {
+  "device_id": "go2-01",
+  "holder_kind": "user|task|session",
+  "holder_id": "…",            // 按 holder_kind：成员 id / 任务 id / 联调会话 id
+  "source": "单机操控",          // 或「联调会话 · 展厅迎宾」「单机 · 由 Kanade 转交」
+  "acquired_at": "…",          // 「已控制 41 分钟」
+  "expires_at": "… | null",    // 联调会话 / 任务持有时为 null
+  "queue": [{"id": "…", "user_id": "…", "reason": "调试步态", "expected_secs": 900,
+             "state": "pending", "created_at": "…", "device_id": "go2-01", "decided_by": null, "decided_at": null}]
+}
+```
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | /leases | 每台可见设备的 `{device_id, name, code, lease, holder_name, queue_len}` |
+| GET | /leases | 每台可见设备 `{device_id, name, code, lease, holder_name, queue}`（`queue` 在无人控制时也可能非空） |
 | POST | /devices/{id}/lease | `{reason?, expected_secs?}` → `{"result":"granted","lease"}` 或 `{"result":"queued","request"}` |
-| POST | /devices/{id}/lease/renew | 续约（默认 300 s；建议剩余 1/3 时自动续约） |
-| DELETE | /devices/{id}/lease?force= | 释放；`force=true` 为管理者强制收回 |
-| POST | /devices/{id}/lease/transfer | `{"kind":"user","id":"…"}` 或 `{"kind":"task","id":"<mission id>"}` |
-| GET | /devices/{id}/lease/requests | 待处理申请队列 |
-| POST | /lease-requests/{id}/approve · /deny | 当前持有者 / 管理员 / 设备管理者 |
+| POST | /devices/{id}/lease/renew | 续约 `lease_term_secs`（策略，默认 300 s；建议剩余 1/3 时自动续约）→ `Lease` |
+| DELETE | /devices/{id}/lease | 释放自己的控制权 → 204 |
+| DELETE | /devices/{id}/lease?force=true&reason=… | 强制收回（设备管理者、平台管理员），`reason` 也可放 body `{"reason"}`；写审计并通知被收回的人 |
+| POST | /devices/{id}/lease/transfer | `{"kind":"user","id":"…","note"?}` 或 `{"kind":"task","id":"<mission id>"}` → `Lease`；通知接收人 |
+| GET | /devices/{id}/lease/requests | 待处理申请 |
+| POST | /lease-requests/{id}/approve · /deny | 批准（控制权转给申请人，时长 = 申请里的 `expected_secs`）/ 拒绝；通知申请人 |
+
+规则（与前端 mock 一致）：
+- 空闲（或已过期）直接获得，否则排队。幂等：持有者再申请返回 `granted` 并续期；已在队列中的人再申请返回原申请。
+- 批准、拒绝、转交：持有者、设备管理者、平台管理员（否则 403）；申请已处理过 409「该申请已处理」。
+- 强制收回：只有设备管理者、平台管理员（403）。
+- 联调会话持有的设备不能转交 / 批准给别人：409 并带 `device_ids`，message 如「Echo 正在联调会话中，请先结束会话或把它移出会话」。
+- 租约到期、空闲释放、断线停止 / 释放的时间来自 `/safety` 的 policies（见「安全策略」），这些自动动作都写设备事件、审计，并给原持有者推 `notice`。
 
 ### 多机联调（Fleet.dc.html）
 
@@ -205,8 +264,8 @@ Member = {
 |---|---|---|
 | GET / POST | /missions | `{name, map_id, waypoints[], schedule?, assignee{}, state?}` |
 | GET / PATCH / DELETE | /missions/{id} | |
-| GET | /safety | `{global_estop, estop_by, estop_at, active_zones, policies}` |
-| PATCH | /safety/policies | 局部更新策略字段（未知字段 400） |
+| GET | /safety | `{global_estop, estop_by, estop_at, active_zones, policies}`，policies 见下 |
+| PATCH | /safety/policies | 局部更新策略字段（未知字段、非法取值 400） |
 | POST | /safety/estop | `{active}` 全局急停（任何人可触发；默认解除需管理者） |
 | GET / POST | /zones?map_id= | `{map_id, name, zone_type, polygon: [[x,y],…], rule?, scope?, schedule?, action?}` |
 | PATCH / DELETE | /zones/{id} | |
@@ -216,6 +275,24 @@ Member = {
 | POST | /alerts/{id}/events | `{message}` 备注 |
 | GET / POST | /alert-rules | `{name, metric, op: > < >= <=, threshold, duration_secs, severity, auto_action?: slow|stop}` |
 | PATCH / DELETE | /alert-rules/{id} | |
+
+安全策略 `policies`（字段名与前端 `SafetyPolicies` 一致）：
+
+```json
+{"auto_dock": true, "dock_threshold": 20,
+ "heartbeat_timeout_ms": 1500, "lost_link_action": "stop|down|dock",
+ "lease_expiry_action": "stop_release|stop_only",
+ "speed_limit": 1.5, "max_yaw_rate": 2.0, "stop_near_people": true, "min_distance": 0.8,
+ "fall_detection": true, "collision_detection": true, "cliff_detection": true,
+ "release_needs_manager": true, "hardware_remotes": 0,
+ "lease_term_secs": 300, "idle_release_secs": 600,
+ "disconnect_stop_secs": 3, "disconnect_release_secs": 60}
+```
+
+- `lost_link_action`：机器人与服务器断联后的动作（下发给机器人执行；`dock` 暂按 `stop` 处理）。
+- `lease_expiry_action`：`stop_release` 到期停止并释放；`stop_only` 到期只停车，持有者可续回，其他人也可直接申请。
+- `idle_release_secs`：持有者多久没有任何操作（指令 / 续约）自动释放，0 表示不释放。
+- `release_needs_manager` 为 true 时，非管理者解除急停 403「需要管理者解除」。
 
 告警规则可用的 `metric`：`max_motor_temp`、`battery`、`latency_ms`、`voltage`、`pitch`、`roll`，
 以及遥测 `extra` 中的任意数值字段（如 `loc_confidence`）。
@@ -237,11 +314,16 @@ Member = {
 {"type": "unsubscribe", "device_ids": ["go2-01"]}
 {"type": "move", "device_id": "go2-01", "vx": 0.6, "vy": 0, "wz": -0.15}
 {"type": "stop", "device_id": "go2-01"}
+{"type": "pointcloud", "device_id": "go2-01", "enable": true}   // 开关点云二进制流（默认关）
 {"type": "ping", "nonce": 1}
 ```
 
 摇杆按 10–20 Hz 发送 `move`；松开后停止发送即可——机器人端看门狗 300 ms 内自动停止，
-前端也应在松开时显式发一次 `stop`。WebSocket 断开时服务器会对该连接驱动过的设备补发停止。
+前端也应在松开时显式发一次 `stop`。
+
+**断线保护**：WebSocket 断开时，服务器立即对该连接驱动过的设备补发停止；该成员**所有**连接都断开后，
+`disconnect_stop_secs`（默认 3 s）后停止其控制的全部设备，`disconnect_release_secs`（默认 60 s）后仍未重连则释放其控制权。
+重连后要重新 `subscribe`，并重新拉一次各列表。
 
 **下行**（`type` 区分；带 `device_id` 的事件按订阅过滤，急停 / 全局事件全部推送）
 
@@ -250,19 +332,24 @@ Member = {
  "vx": 0.6, "vy": 0, "wz": -0.15, "roll": 0, "pitch": 0, "yaw": 1.2,
  "joint_temps": [[41,44,46],[40,43,45],[42,47,52],[39,42,44]],   // FL FR RL RR × hip thigh calf
  "foot_forces": [80,82,79,85], "voltage": 25.1, "current": 3.2,
- "pose": {"x": 1.2, "y": 3.4, "yaw": 1.2}, "mode": "walk", "extra": {}}
+ "pose": {"x": 1.2, "y": 3.4, "yaw": 1.2}, "map_id": "b2", "mode": "walk",
+ "extra": {"acc": [0.01, -0.02, 9.81], "loc_confidence": 0.92, "battery_temp": 31.0}}
 {"type": "device_status", "device_id": "…", "status": "online", "online": true, "location": null, "task": null}
-{"type": "lease_changed", "device_id": "…", "lease": {…} | null, "queue_len": 1}
+{"type": "lease_changed", "device_id": "…", "lease": Lease | null, "queue_len": 1}   // lease 含完整 queue
 {"type": "lease_requested", "device_id": "…", "request_id": "…", "requester": "林悦"}
 {"type": "command_ack", "device_id": "…", "cmd_id": "…", "ok": true, "error": null}
 {"type": "estop", "device_id": null | "go2-01", "active": true, "by": "Kanade"}
 {"type": "alert", "alert_id": "…", "device_id": "…", "severity": "critical", "title": "电机过热", "state": "open"}
 {"type": "robot_event", "device_id": "…", "level": "warning", "code": "fall", "message": "…"}
+{"type": "device_event", "device_id": "…", "event": {"at": "…", "text": "Kanade 获得控制权", "tone": "info"}}
 {"type": "changed", "resource": "members", "id": "… | null"}   // 通用失效通知：重新 GET 对应资源，见下表
 {"type": "notice", "member_id": "…", "level": "info|warning", "text": "Kanade 收回了你对 Alpha 的控制权：…"}  // 只发给本人
 {"type": "pong", "nonce": 1}
-{"type": "error", "message": "你没有该设备的控制权（只读）"}
+{"type": "error", "code": "forbidden", "message": "你没有该设备的控制权（只读）"}   // 上行消息失败，code 同 REST
 ```
+
+**点云二进制帧**（`pointcloud` 开启后，约 5–10 Hz）：
+`[device_id 长度 u8][device_id UTF-8][ts i64 LE，毫秒][N × (f32 x, f32 y) LE]`，单位米，机器人坐标系 +y 朝前、+x 朝右。
 
 `changed.resource` 取值（`id` 为空表示整个列表都变了）：
 
@@ -270,6 +357,11 @@ Member = {
 |---|---|
 | `members` | `GET /members`（也用于成员上线 / 下线） |
 | `audit` | `GET /audit` |
+| `devices` | `GET /devices`（注册、删除、改名、改分组） |
+| `device_groups` | `GET /device-groups` |
+| `leases` | `GET /leases`（同时也会推 `lease_changed`） |
+| `safety` | `GET /safety`（急停、策略、演练） |
+| `fleet_sessions` | `GET /fleet-sessions` |
 
 ---
 
@@ -279,15 +371,19 @@ Member = {
 机器人**主动外连**服务器（适配 NAT / 4G），指令经同一连接下发。
 
 ```
-robot → hello {protocol, model, firmware, sn, ip, capabilities[], skills[{name, description, tags}]}
-server → welcome {protocol, server_time, estop, telemetry_hz, max_speed_mps, max_yaw_rate}
+robot → hello {protocol, model, firmware, sn, ip, capabilities[], skills[{name, description, tags, motion}], sensors?}
+server → welcome {protocol, server_time, estop, telemetry_hz, max_speed_mps, max_yaw_rate,
+                  lost_link_action, heartbeat_timeout_ms}
 robot → state {status, location, task}
 robot → telemetry {...}           // telemetry_hz，默认 10 Hz
 server → ping {nonce}  ◀▶  robot → pong {nonce}     // 每秒，用于测延迟
 server → command {cmd_id, command}
 robot → ack {cmd_id, ok, error}   // move 成功不回执
 robot → event {level, code, message}   // level=critical/warning 自动生成告警；code=estop 同步急停
+robot → <binary> [ts i64 LE][N × (f32 x, f32 y) LE]   // 点云二维投影，服务器加上设备 id 转发给订阅的前端
 ```
+
+急停指令 `{"kind":"estop","drill":true}` 是**演练**：机器人走一遍急停链路并回执，但不驱动硬件、不进入急停状态。
 
 `hello.skills` 是机器人端可执行的技能目录（Go2 后端为 Go2Agent 注册的 44 个技能），服务器存入
 `devices.meta.skills`；前端用它渲染动作按钮，并用 `{"kind":"action","name":"<技能名>","params":{…}}` 下发。

@@ -22,7 +22,7 @@ use crate::{
     error::{AppError, AppResult},
     models::DeviceStatus,
     protocol::{PROTOCOL_VERSION, RobotToServer, ServerEvent, ServerToRobot},
-    services::audit,
+    services::{audit, events},
     state::AppState,
 };
 
@@ -73,8 +73,10 @@ async fn handle(st: AppState, device_id: String, socket: WebSocket) {
         server_time: Utc::now(),
         estop: global_estop || st.hub.is_device_estopped(&device_id),
         telemetry_hz: st.cfg.telemetry_hz,
-        max_speed_mps: policies.max_speed_mps,
+        max_speed_mps: policies.speed_limit,
         max_yaw_rate: policies.max_yaw_rate,
+        lost_link_action: policies.lost_link_action.clone(),
+        heartbeat_timeout_ms: policies.heartbeat_timeout_ms,
     };
     if sink.send(encode(&welcome)).await.is_err() {
         st.hub.unregister_robot(&device_id, conn_id);
@@ -114,7 +116,14 @@ async fn handle(st: AppState, device_id: String, socket: WebSocket) {
             }
             Ok(None) | Ok(Some(Err(_))) | Ok(Some(Ok(Message::Close(_)))) => break,
             Ok(Some(Ok(Message::Text(t)))) => t,
-            Ok(Some(Ok(_))) => continue, // 协议层 ping/pong、二进制帧（预留给点云）
+            Ok(Some(Ok(Message::Binary(b)))) => {
+                // 点云：[ts i64 LE][N × (f32 x, f32 y) LE]，机器人坐标系，+y 朝前、+x 朝右
+                if b.len() >= 8 && (b.len() - 8) % 8 == 0 && b.len() <= 512 * 1024 {
+                    st.hub.publish_pointcloud(&device_id, b);
+                }
+                continue;
+            }
+            Ok(Some(Ok(_))) => continue, // 协议层 ping / pong
         };
         let msg = match serde_json::from_str::<RobotToServer>(text.as_str()) {
             Ok(m) => m,
@@ -149,6 +158,7 @@ async fn on_message(
             ip,
             capabilities,
             skills,
+            sensors,
         } => {
             if protocol != PROTOCOL_VERSION {
                 tracing::warn!(device = %device_id, protocol, "机器人协议版本不一致");
@@ -157,7 +167,9 @@ async fn on_message(
             let res = sqlx::query(
                 "UPDATE devices SET firmware = COALESCE($2, firmware), sn = COALESCE($3, sn),
                  ip = COALESCE($4, ip),
-                 meta = meta || jsonb_build_object('capabilities', $5::jsonb, 'skills', $6::jsonb),
+                 meta = meta || jsonb_build_object('capabilities', $5::jsonb, 'skills', $6::jsonb)
+                        || CASE WHEN $7::jsonb IS NULL THEN '{}'::jsonb
+                                ELSE jsonb_build_object('sensors', $7::jsonb) END,
                  updated_at = now() WHERE id = $1",
             )
             .bind(device_id)
@@ -166,6 +178,7 @@ async fn on_message(
             .bind(ip)
             .bind(serde_json::json!(capabilities))
             .bind(serde_json::json!(skills))
+            .bind(sensors)
             .execute(&st.db)
             .await;
             if let Err(e) = res {
@@ -180,6 +193,7 @@ async fn on_message(
                 *last_persist = Instant::now();
                 let _ = st.telemetry_tx.try_send(TelemetrySample {
                     device_id: device_id.to_owned(),
+                    latency_ms: latency,
                     data: t.clone(),
                 });
             }
@@ -247,6 +261,12 @@ async fn on_message(
             {
                 tracing::error!(error = %e, "处理机器人事件失败");
             }
+            let tone = match level.as_str() {
+                "critical" | "error" => "critical",
+                "warning" | "warn" => "warning",
+                _ => "neutral",
+            };
+            events::record(st, device_id, message.clone(), tone).await;
             // 机器人本地急停按钮 / 遥控器急停：同步到服务端状态
             if code == "estop" {
                 st.hub.set_device_estop(device_id, true);
@@ -291,12 +311,23 @@ async fn set_online(st: &AppState, device_id: &str, online: bool) {
         }),
         Err(e) => tracing::warn!(error = %e, "更新在线状态失败"),
     }
+    events::record(
+        st,
+        device_id,
+        if online {
+            "设备上线"
+        } else {
+            "设备离线"
+        },
+        if online { "success" } else { "neutral" },
+    )
+    .await;
     // 断线后服务端已无法下发；停止由机器人端看门狗负责
     if !online {
         audit::record_system(
             st,
             audit::Kind::System,
-            "设备断开连接",
+            format!("{} 断开连接", audit::device_label(st, device_id).await),
             device_id,
             serde_json::json!({}),
         )

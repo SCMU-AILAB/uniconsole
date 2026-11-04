@@ -38,7 +38,31 @@ class MockBackend(RobotBackend):
         return {"model": self._model, "firmware": "mock-1.0", "sn": "MOCK-0001", "ip": "127.0.0.1"}
 
     def skills(self) -> list[dict[str, Any]]:
-        return [{"name": k, "description": v, "tags": []} for k, v in SKILLS.items()]
+        return [{"name": k, "description": v, "tags": [], "motion": True} for k, v in SKILLS.items()]
+
+    def sensors(self) -> dict[str, Any]:
+        return {
+            "lidar": "4D LiDAR · 360°×90° · 21,600 点/秒 · 10 Hz（模拟）",
+            "cameras": [
+                {"name": "前置 RGB", "detail": "1280×720 · 30 fps", "health": "ok", "hz": 30},
+                {"name": "深度", "detail": "640×480 · 15 fps", "health": "ok", "hz": 15},
+            ],
+            "topics": [
+                {"name": "/utlidar/cloud", "detail": "PointCloud2", "health": "ok", "hz": 10},
+                {"name": "/sportmodestate", "detail": "SportModeState", "health": "ok", "hz": 50},
+            ],
+        }
+
+    async def pointcloud(self) -> list[tuple[float, float]]:
+        # 模拟一个 8 m × 6 m 的房间轮廓 + 噪声
+        pts = []
+        for i in range(720):
+            a = i / 720 * 2 * math.pi
+            c, s = math.cos(a), math.sin(a)
+            r = min(4.0 / abs(c) if abs(c) > 1e-6 else 99, 3.0 / abs(s) if abs(s) > 1e-6 else 99)
+            r += random.uniform(-0.03, 0.03)
+            pts.append((round(r * c, 3), round(r * s, 3)))
+        return pts
 
     async def move(self, vx: float, vy: float, wz: float) -> None:
         if self._mode in ("down", "damp"):
@@ -97,5 +121,10 @@ class MockBackend(RobotBackend):
             current=round(1.5 + speed * 6 + random.uniform(-0.2, 0.2), 2),
             pose=Pose(x=round(p.x, 3), y=round(p.y, 3), yaw=round(p.yaw, 3)),
             mode=self._mode,
-            extra={"loc_confidence": 0.92},
+            map_id="b2",
+            extra={
+                "loc_confidence": 0.92,
+                "acc": [round(random.uniform(-0.1, 0.1), 3), round(random.uniform(-0.1, 0.1), 3), 9.81],
+                "battery_temp": round(31.0 + speed * 4, 1),
+            },
         )

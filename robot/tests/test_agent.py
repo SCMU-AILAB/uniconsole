@@ -148,3 +148,49 @@ def test_local_control_disabled_without_token():
         assert (
             client.post("/commands", json={"kind": "stop"}, headers={"X-Local-Token": ""}).status_code == 403
         )
+
+
+# ───────── 第二批协议：演练急停、断联策略、技能 motion、点云 ─────────
+
+
+def test_drill_estop_does_not_touch_hardware():
+    c, _ = make_controller()
+    run(c.handle(CommandAdapter.validate_python({"kind": "estop", "drill": True})))
+    assert not c.estop and ("damp",) not in c.backend.calls
+    run(c.handle(CommandAdapter.validate_python({"kind": "estop"})))
+    assert c.estop and ("damp",) in c.backend.calls
+
+
+def test_lost_link_action_down():
+    c, _ = make_controller()
+    c.lost_link_action = "down"
+    run(c.on_link_lost())
+    assert c.backend.calls[-2:] == [("stop",), ("mode", "down")]
+
+
+def test_welcome_carries_policy():
+    raw = json.dumps(
+        {
+            "type": "welcome",
+            "protocol": 1,
+            "server_time": "2026-11-02T06:00:00Z",
+            "estop": False,
+            "telemetry_hz": 10,
+            "max_speed_mps": 1.5,
+            "max_yaw_rate": 2.0,
+            "lost_link_action": "down",
+            "heartbeat_timeout_ms": 2000,
+        }
+    )
+    w = ServerMessageAdapter.validate_json(raw)
+    assert w.lost_link_action == "down" and w.heartbeat_timeout_ms == 2000
+
+
+def test_mock_skills_sensors_pointcloud():
+    b = MockBackend()
+    assert all("motion" in s for s in b.skills())
+    assert b.sensors()["cameras"]
+    pts = run(b.pointcloud())
+    assert len(pts) == 720 and all(abs(x) <= 4.1 and abs(y) <= 3.1 for x, y in pts)
+    t = run(b.telemetry())
+    assert t.map_id == "b2" and len(t.extra["acc"]) == 3

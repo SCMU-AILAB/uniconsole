@@ -6,6 +6,8 @@
 
 import asyncio
 import logging
+import struct
+import time
 
 from pydantic import BaseModel, ValidationError
 from websockets.asyncio.client import ClientConnection, connect
@@ -95,12 +97,20 @@ class ServerLink:
 
     async def _session(self, ws: ClientConnection) -> None:
         backend = self.controller.backend
-        await self.send(Hello(capabilities=backend.capabilities, skills=backend.skills(), **backend.info()))
+        await self.send(
+            Hello(
+                capabilities=list(backend.capabilities),
+                skills=backend.skills(),
+                sensors=backend.sensors(),
+                **backend.info(),
+            )
+        )
 
         welcome = ServerMessageAdapter.validate_json(await asyncio.wait_for(ws.recv(), timeout=5))
         if not isinstance(welcome, Welcome):
             raise TypeError(f"期望 welcome，收到 {welcome!r}")
         self.controller.apply_server_limits(welcome.max_speed_mps, welcome.max_yaw_rate)
+        self.controller.lost_link_action = welcome.lost_link_action
         if welcome.estop and not self.controller.estop:
             await self.controller.trigger_estop(source="server")
         self._telemetry_hz = max(1, min(welcome.telemetry_hz, 50))
@@ -111,11 +121,28 @@ class ServerLink:
         await self.send(StateMsg(status="online"))
 
         telemetry = asyncio.ensure_future(self._telemetry_loop())
+        cloud = asyncio.ensure_future(self._pointcloud_loop())
         try:
             async for raw in ws:
                 await self._on_message(raw)
         finally:
             telemetry.cancel()
+            cloud.cancel()
+
+    async def _pointcloud_loop(self, hz: float = 5.0) -> None:
+        """点云二进制帧：[ts i64 LE][N × (f32 x, f32 y) LE]，后端不支持时直接退出。"""
+        while True:
+            pts = await self.controller.backend.pointcloud()
+            if pts is None:
+                return
+            ws = self._ws
+            if ws is not None:
+                frame = struct.pack("<q", int(time.time() * 1000)) + b"".join(
+                    struct.pack("<ff", x, y) for x, y in pts
+                )
+                async with self._send_lock:
+                    await ws.send(frame)
+            await asyncio.sleep(1.0 / hz)
 
     async def _telemetry_loop(self) -> None:
         period = 1.0 / self._telemetry_hz

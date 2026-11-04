@@ -41,6 +41,8 @@ class SetSpeedCmd(BaseModel):
 
 class EstopCmd(BaseModel):
     kind: Literal["estop"] = "estop"
+    # 急停演练：走一遍急停链路并回执，但不驱动硬件
+    drill: bool = False
 
 
 class ReleaseEstopCmd(BaseModel):
@@ -97,6 +99,7 @@ class Telemetry(BaseModel):
     current: float = 0.0
     pose: Pose | None = None
     mode: str | None = None
+    map_id: str | None = None  # pose 所在地图（服务器 GET /maps 的 id）
     extra: dict = Field(default_factory=dict)
 
 
@@ -108,7 +111,8 @@ class Hello(BaseModel):
     sn: str | None = None
     ip: str | None = None
     capabilities: list[str] = Field(default_factory=list)
-    skills: list[dict] = Field(default_factory=list)  # [{name, description, tags}]
+    skills: list[dict] = Field(default_factory=list)  # [{name, description, tags, motion}]
+    sensors: dict | None = None  # {lidar, cameras[], topics[]}
 
 
 class TelemetryMsg(Telemetry):
@@ -154,6 +158,8 @@ class Welcome(BaseModel):
     telemetry_hz: int
     max_speed_mps: float
     max_yaw_rate: float
+    lost_link_action: str = "stop"  # stop | down | dock
+    heartbeat_timeout_ms: int = 1500
 
 
 class CommandMsg(BaseModel):

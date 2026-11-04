@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use uniconsole_domain::{AlertSeverity, AlertState, DeviceStatus, Lease};
+use uniconsole_domain::{AlertSeverity, AlertState, DeviceEvent, DeviceStatus, Lease};
 
 pub const PROTOCOL_VERSION: u32 = 1;
 
@@ -54,7 +54,11 @@ pub enum Command {
     SetSpeed {
         level: SpeedLevel,
     },
-    Estop,
+    /// `drill = true`：急停演练，机器人走一遍急停链路并回执，但不真的停机
+    Estop {
+        #[serde(default)]
+        drill: bool,
+    },
     ReleaseEstop,
     /// 预置动作 / 技能调用，例如 hello、stretch、take_photo
     Action {
@@ -71,7 +75,7 @@ impl Command {
         !matches!(
             self,
             Command::Stop
-                | Command::Estop
+                | Command::Estop { .. }
                 | Command::ReleaseEstop
                 | Command::SetMode {
                     mode: MotionMode::Damp
@@ -131,6 +135,9 @@ pub struct Telemetry {
     pub pose: Option<Pose>,
     #[serde(default)]
     pub mode: Option<String>,
+    /// pose 所在的地图（GET /maps 的 id）
+    #[serde(default)]
+    pub map_id: Option<String>,
     /// 其他扩展字段（定位置信度、雷达状态等）
     #[serde(default)]
     pub extra: Value,
@@ -160,6 +167,9 @@ pub enum RobotToServer {
         /// 技能目录 [{name, description, tags}]，存入 devices.meta.skills 供前端展示
         #[serde(default)]
         skills: Vec<Value>,
+        /// 传感器描述 {lidar, cameras[], topics[]}，存入 devices.meta.sensors
+        #[serde(default)]
+        sensors: Option<Value>,
     },
     Telemetry(Telemetry),
     /// 机器人自身状态变化（任务中 / 充电 / 位置描述）
@@ -196,6 +206,9 @@ pub enum ServerToRobot {
         telemetry_hz: u32,
         max_speed_mps: f32,
         max_yaw_rate: f32,
+        /// 与服务器断联后的动作：stop | down | dock
+        lost_link_action: String,
+        heartbeat_timeout_ms: u64,
     },
     Command {
         cmd_id: Uuid,
@@ -228,6 +241,11 @@ pub enum ClientToServer {
     },
     Stop {
         device_id: String,
+    },
+    /// 开关某台设备的点云二进制流（默认关闭，数据量较大）
+    Pointcloud {
+        device_id: String,
+        enable: bool,
     },
     Ping {
         nonce: u64,
@@ -285,6 +303,11 @@ pub enum ServerEvent {
         code: String,
         message: String,
     },
+    /// 设备事件（GET /devices/{id}/events 的增量）
+    DeviceEvent {
+        device_id: String,
+        event: DeviceEvent,
+    },
     /// 通用失效通知：前端收到后重新 GET 对应资源。`id` 为空表示整个列表都变了。
     Changed {
         resource: String,
@@ -299,7 +322,9 @@ pub enum ServerEvent {
     Pong {
         nonce: u64,
     },
+    /// 上行消息处理失败（code 同 REST 错误码，如 estop_active、forbidden）
     Error {
+        code: String,
         message: String,
     },
 }
@@ -320,7 +345,8 @@ impl ServerEvent {
             | ServerEvent::LeaseChanged { device_id, .. }
             | ServerEvent::LeaseRequested { device_id, .. }
             | ServerEvent::CommandAck { device_id, .. }
-            | ServerEvent::RobotEvent { device_id, .. } => Some(device_id),
+            | ServerEvent::RobotEvent { device_id, .. }
+            | ServerEvent::DeviceEvent { device_id, .. } => Some(device_id),
             ServerEvent::Estop { device_id, .. } | ServerEvent::Alert { device_id, .. } => {
                 device_id.as_deref()
             }
@@ -373,7 +399,7 @@ mod tests {
             .is_motion()
         );
         assert!(!Command::Stop.is_motion());
-        assert!(!Command::Estop.is_motion());
+        assert!(!Command::Estop { drill: false }.is_motion());
         assert!(
             !Command::SetMode {
                 mode: MotionMode::Damp

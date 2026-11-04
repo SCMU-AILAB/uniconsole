@@ -10,6 +10,7 @@ use crate::protocol::Telemetry;
 
 pub struct TelemetrySample {
     pub device_id: String,
+    pub latency_ms: Option<u32>,
     pub data: Telemetry,
 }
 
@@ -46,7 +47,7 @@ pub fn spawn_telemetry_writer(db: PgPool) -> mpsc::Sender<TelemetrySample> {
 
 async fn flush(db: &PgPool, rows: &[TelemetrySample]) -> sqlx::Result<()> {
     let mut qb: QueryBuilder<Postgres> = QueryBuilder::new(
-        "INSERT INTO telemetry (device_id, ts, battery, vx, vy, wz, roll, pitch, yaw, voltage, current, max_motor_temp, data) ",
+        "INSERT INTO telemetry (device_id, ts, battery, vx, vy, wz, roll, pitch, yaw, voltage, current, max_motor_temp, latency_ms, data) ",
     );
     qb.push_values(rows, |mut b, s| {
         let t = &s.data;
@@ -62,6 +63,7 @@ async fn flush(db: &PgPool, rows: &[TelemetrySample]) -> sqlx::Result<()> {
             .push_bind(t.voltage)
             .push_bind(t.current)
             .push_bind(t.max_motor_temp())
+            .push_bind(s.latency_ms.map(|l| l as i32))
             .push_bind(serde_json::to_value(t).unwrap_or_default());
     });
     qb.push(" ON CONFLICT DO NOTHING");

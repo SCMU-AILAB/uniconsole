@@ -22,6 +22,11 @@ log = logging.getLogger(__name__)
 # 与 Go2Agent UnitreeGo2Config 默认值一致
 GO2AGENT_DEFAULT_LIMITS = VelocityLimits(0.3, 0.3, 0.6)
 
+# 不会让机身运动的技能（停止 / 卸力 / 模式开关）；其余技能都视为运动技能
+NON_MOTION_SKILLS = frozenset(
+    {"stop", "stop_move", "damp", "switch_avoid_mode", "switch_joystick", "auto_recover_set", "free_avoid"}
+)
+
 # 服务器 MotionMode → Go2Agent 技能
 MODE_SKILLS = {
     "stand": "stand_up",
@@ -88,7 +93,12 @@ class Go2AgentBackend(RobotBackend):
 
     def skills(self) -> list[dict[str, Any]]:
         return [
-            {"name": s.metadata.name, "description": s.metadata.description, "tags": list(s.metadata.tags)}
+            {
+                "name": s.metadata.name,
+                "description": s.metadata.description,
+                "tags": list(s.metadata.tags),
+                "motion": s.metadata.name not in NON_MOTION_SKILLS,
+            }
             for s in self.runtime.registry.list()
         ]
 

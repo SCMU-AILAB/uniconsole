@@ -143,7 +143,7 @@ pub async fn remove(
     ensure_owner(&user, &s)?;
     if s.active {
         stop_all(&st, &s).await;
-        st.leases.release_session(id).await?;
+        st.leases.release_session(id, None).await?;
     }
     sqlx::query("DELETE FROM fleet_sessions WHERE id = $1")
         .bind(id)
@@ -201,7 +201,7 @@ pub async fn stop(
     let s = load(&st, id).await?;
     ensure_owner(&user, &s)?;
     stop_all(&st, &s).await;
-    st.leases.release_session(id).await?;
+    st.leases.release_session(id, None).await?;
     let s: FleetSession = sqlx::query_as(
         "UPDATE fleet_sessions SET active = FALSE, updated_at = now() WHERE id = $1 RETURNING *",
     )

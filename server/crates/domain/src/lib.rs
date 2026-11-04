@@ -142,8 +142,8 @@ pub struct DeviceRow {
     pub sn: Option<String>,
     pub firmware: Option<String>,
     pub ip: Option<String>,
-    #[serde(rename = "group")]
-    pub grp: Option<String>,
+    /// 设备分组（GET /device-groups）
+    pub group_id: Option<String>,
     pub owner_id: Option<Uuid>,
     pub status: DeviceStatus,
     pub location: Option<String>,
@@ -160,17 +160,42 @@ pub struct DeviceView {
     #[serde(flatten)]
     pub device: DeviceRow,
     pub online: bool,
+    /// 最近一帧遥测的电量（离线时保留最后已知值），机器人拿不到时为 null
     pub battery: Option<f32>,
+    /// 离线时为 null
     pub latency_ms: Option<u32>,
+    /// 离线时为 null
     pub max_motor_temp: Option<f32>,
     pub uptime_secs: Option<i64>,
+    /// 单机急停中（全局急停时也为 true）
     pub estop: bool,
     pub lease: Option<Lease>,
+    /// 当前持有控制权的成员（lease.holder_kind == user 时）
+    pub user_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct DeviceGroup {
+    pub id: String,
+    pub name: String,
+    /// online | busy | warning | action | critical | neutral
+    pub tone: String,
+    pub sort: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct DeviceEvent {
+    pub at: DateTime<Utc>,
+    pub text: String,
+    /// info | success | warning | critical | neutral
+    pub tone: String,
 }
 
 // ───────────── 租约 ─────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct Lease {
     pub device_id: String,
@@ -181,6 +206,9 @@ pub struct Lease {
     pub source: String,
     pub acquired_at: DateTime<Utc>,
     pub expires_at: Option<DateTime<Utc>>,
+    /// 申请队列（按申请时间）；数据库里不存，由服务端补上
+    #[cfg_attr(feature = "sqlx", sqlx(skip))]
+    pub queue: Vec<LeaseRequest>,
 }
 
 impl Lease {
@@ -190,6 +218,40 @@ impl Lease {
     pub fn held_by_user(&self, user: Uuid) -> bool {
         self.holder_kind == LeaseHolderKind::User && self.holder_id == Some(user)
     }
+    /// 对外的持有者 id：成员 / 联调会话 / 任务
+    pub fn holder(&self) -> Option<Uuid> {
+        match self.holder_kind {
+            LeaseHolderKind::User => self.holder_id,
+            LeaseHolderKind::Session => self.session_id,
+            LeaseHolderKind::Task => self.task_id,
+        }
+    }
+}
+
+/// 对外形状（前端 Lease）：`holder_id` 按 `holder_kind` 指向成员 / 会话 / 任务
+impl Serialize for Lease {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        struct Out<'a> {
+            device_id: &'a str,
+            holder_kind: LeaseHolderKind,
+            holder_id: Option<Uuid>,
+            source: &'a str,
+            acquired_at: DateTime<Utc>,
+            expires_at: Option<DateTime<Utc>>,
+            queue: &'a [LeaseRequest],
+        }
+        Out {
+            device_id: &self.device_id,
+            holder_kind: self.holder_kind,
+            holder_id: self.holder(),
+            source: &self.source,
+            acquired_at: self.acquired_at,
+            expires_at: self.expires_at,
+            queue: &self.queue,
+        }
+        .serialize(s)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -197,6 +259,8 @@ impl Lease {
 pub struct LeaseRequest {
     pub id: Uuid,
     pub device_id: String,
+    /// 申请人
+    #[serde(rename = "user_id")]
     pub requester_id: Uuid,
     pub reason: String,
     pub expected_secs: i32,
@@ -296,7 +360,8 @@ pub struct Zone {
     pub zone_type: ZoneType,
     pub polygon: Value,
     pub rule: String,
-    pub scope: Value,
+    /// 显示文本，如「全部设备」「Go2 系列」
+    pub scope: String,
     pub schedule: String,
     pub action: String,
     pub enabled: bool,

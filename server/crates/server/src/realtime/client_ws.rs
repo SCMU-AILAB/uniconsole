@@ -3,11 +3,18 @@
 //! - 下行：按订阅过滤的遥测、设备状态、租约、告警、急停事件
 //! - 上行：订阅管理、摇杆 move（高频、无回执）、stop
 //!
-//! 断线保护：连接断开时，对该连接驱动过的设备补发 Stop。
+//! 断线保护：
+//! - 连接断开时，对该连接驱动过的设备立即补发 Stop；
+//! - 该成员所有连接都断开后，按策略 `disconnect_stop_secs` 停止其控制的全部设备，
+//!   `disconnect_release_secs` 后仍未重连则释放其控制权。
+//!
+//! 点云：`{"type":"pointcloud","device_id","enable":true}` 开启后，服务端以二进制帧推送
+//! `[device_id 长度 u8][device_id UTF-8][机器人原始帧：ts i64 LE + N × (f32 x, f32 y) LE]`。
 
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use axum::{
+    body::Bytes,
     extract::{
         State, WebSocketUpgrade,
         ws::{Message, WebSocket},
@@ -22,8 +29,9 @@ use crate::{
     error::AppResult,
     protocol::{ClientToServer, Command, ServerEvent},
     services::{
-        access,
+        access, audit,
         control::{self, Actor},
+        events,
     },
     state::AppState,
 };
@@ -46,9 +54,27 @@ fn json(ev: &ServerEvent) -> Message {
     Message::Text(serde_json::to_string(ev).expect("serialize").into())
 }
 
+fn error(e: &crate::error::AppError) -> ServerEvent {
+    ServerEvent::Error {
+        code: e.code().to_owned(),
+        message: e.to_string(),
+    }
+}
+
+fn cloud_frame(device_id: &str, frame: &Bytes) -> Message {
+    let id = device_id.as_bytes();
+    let mut out = Vec::with_capacity(1 + id.len() + frame.len());
+    out.push(id.len().min(255) as u8);
+    out.extend_from_slice(&id[..id.len().min(255)]);
+    out.extend_from_slice(frame);
+    Message::Binary(out.into())
+}
+
 async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, socket: WebSocket) {
     let (mut sink, mut stream) = socket.split();
     let mut events = st.hub.subscribe();
+    let mut clouds_rx = st.hub.subscribe_pointcloud();
+    let mut clouds: HashSet<String> = HashSet::new();
     let mut subs = Subs::Some(HashSet::new());
     let mut driving: HashSet<String> = HashSet::new();
     let can_see = |id: &str| visible.as_ref().is_none_or(|v| v.contains(id));
@@ -67,8 +93,8 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                     Some(Ok(_)) => continue,
                 };
                 let reply = match serde_json::from_str::<ClientToServer>(text.as_str()) {
-                    Err(e) => Some(ServerEvent::Error { message: format!("无法解析消息：{e}") }),
-                    Ok(msg) => on_message(&st, &user, msg, &mut subs, &mut driving, &can_see).await,
+                    Err(e) => Some(ServerEvent::Error { code: "bad_request".into(), message: format!("无法解析消息：{e}") }),
+                    Ok(msg) => on_message(&st, &user, msg, &mut subs, &mut driving, &mut clouds, &can_see).await,
                 };
                 if let Some(r) = reply
                     && sink.send(json(&r)).await.is_err() { break; }
@@ -94,6 +120,15 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                     break;
                 }
             }
+            frame = clouds_rx.recv(), if !clouds.is_empty() => {
+                match frame {
+                    Ok(f) if clouds.contains(&f.0) => {
+                        if sink.send(cloud_frame(&f.0, &f.1)).await.is_err() { break; }
+                    }
+                    Ok(_) | Err(RecvError::Lagged(_)) => {}
+                    Err(RecvError::Closed) => break,
+                }
+            }
         }
     }
 
@@ -117,8 +152,71 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
             .await;
         st.hub
             .publish(ServerEvent::changed("members", Some(user.id)));
+        if !st.leases.held_by(user.id).is_empty() {
+            tokio::spawn(disconnect_guard(st.clone(), user.clone()));
+        }
     }
     tracing::debug!(user = %user.name, "前端已断开");
+}
+
+/// 操控者所有连接都断开后的保护：先停车，再释放控制权（重连则取消）
+async fn disconnect_guard(st: AppState, user: AuthUser) {
+    let p = st.safety.policies();
+    let stop_after = Duration::from_secs(p.disconnect_stop_secs.max(0) as u64);
+    let release_after = Duration::from_secs(p.disconnect_release_secs.max(0) as u64);
+
+    tokio::time::sleep(stop_after).await;
+    if st.hub.is_user_online(user.id) {
+        return;
+    }
+    for lease in st.leases.held_by(user.id) {
+        let _ = control::execute(
+            &st,
+            Actor::System("操控者断线"),
+            &lease.device_id,
+            Command::Stop,
+            false,
+        )
+        .await;
+    }
+
+    tokio::time::sleep(release_after.saturating_sub(stop_after)).await;
+    if st.hub.is_user_online(user.id) {
+        return;
+    }
+    for lease in st.leases.held_by(user.id) {
+        if st
+            .leases
+            .release(&lease.device_id, Some(user.id))
+            .await
+            .is_ok()
+        {
+            let label = audit::device_label(&st, &lease.device_id).await;
+            events::record(
+                &st,
+                &lease.device_id,
+                format!(
+                    "{} 断线超过 {} 秒，自动释放控制权",
+                    user.name,
+                    release_after.as_secs()
+                ),
+                "warning",
+            )
+            .await;
+            audit::record_system(
+                &st,
+                audit::Kind::Control,
+                format!(
+                    "{} 断线超过 {} 秒，自动释放 {label} 的控制权",
+                    user.name,
+                    release_after.as_secs()
+                ),
+                &label,
+                serde_json::json!({ "holder": user.id }),
+            )
+            .await;
+        }
+    }
 }
 
 async fn on_message(
@@ -127,6 +225,7 @@ async fn on_message(
     msg: ClientToServer,
     subs: &mut Subs,
     driving: &mut HashSet<String>,
+    clouds: &mut HashSet<String>,
     can_see: &impl Fn(&str) -> bool,
 ) -> Option<ServerEvent> {
     match msg {
@@ -167,6 +266,7 @@ async fn on_message(
         } => {
             if !can_see(&device_id) {
                 return Some(ServerEvent::Error {
+                    code: "forbidden".into(),
                     message: format!("无权访问设备 {device_id}"),
                 });
             }
@@ -183,14 +283,13 @@ async fn on_message(
                     driving.insert(device_id);
                     None
                 }
-                Err(e) => Some(ServerEvent::Error {
-                    message: e.to_string(),
-                }),
+                Err(e) => Some(error(&e)),
             }
         }
         ClientToServer::Stop { device_id } => {
             if !can_see(&device_id) {
                 return Some(ServerEvent::Error {
+                    code: "forbidden".into(),
                     message: format!("无权访问设备 {device_id}"),
                 });
             }
@@ -198,9 +297,21 @@ async fn on_message(
             control::execute(st, Actor::User(user), &device_id, Command::Stop, false)
                 .await
                 .err()
-                .map(|e| ServerEvent::Error {
-                    message: e.to_string(),
-                })
+                .map(|e| error(&e))
+        }
+        ClientToServer::Pointcloud { device_id, enable } => {
+            if !can_see(&device_id) {
+                return Some(ServerEvent::Error {
+                    code: "forbidden".into(),
+                    message: format!("无权访问设备 {device_id}"),
+                });
+            }
+            if enable {
+                clouds.insert(device_id);
+            } else {
+                clouds.remove(&device_id);
+            }
+            None
         }
         ClientToServer::Ping { nonce } => Some(ServerEvent::Pong { nonce }),
     }

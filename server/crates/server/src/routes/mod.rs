@@ -82,6 +82,16 @@ pub fn router(state: AppState) -> Router {
             get(devices::command_log).post(devices::send_command),
         )
         .route("/devices/{id}/estop", post(devices::estop))
+        .route("/devices/{id}/events", get(devices::events))
+        .route("/devices/{id}/sensors", get(devices::sensors))
+        .route(
+            "/device-groups",
+            get(devices::list_groups).post(devices::create_group),
+        )
+        .route(
+            "/device-groups/{id}",
+            patch(devices::update_group).delete(devices::delete_group),
+        )
         // 控制权（Lease.dc.html）
         .route("/leases", get(leases::overview))
         .route(

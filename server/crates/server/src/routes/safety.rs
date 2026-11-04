@@ -97,7 +97,8 @@ pub struct UpsertZone {
     /// [[x, y], ...]
     pub polygon: Option<Value>,
     pub rule: Option<String>,
-    pub scope: Option<Value>,
+    /// 显示文本，如「全部设备」
+    pub scope: Option<String>,
     pub schedule: Option<String>,
     pub action: Option<String>,
     pub enabled: Option<bool>,
@@ -135,8 +136,8 @@ pub async fn create_zone(
     };
     let z: Zone = sqlx::query_as(
         "INSERT INTO zones (map_id, name, zone_type, polygon, rule, scope, schedule, action, enabled)
-         VALUES ($1, $2, $3, $4, COALESCE($5, ''), COALESCE($6, '{\"all\": true}'::jsonb),
-                 COALESCE($7, '始终'), COALESCE($8, ''), COALESCE($9, TRUE))
+         VALUES ($1, $2, $3, $4, COALESCE($5, ''), COALESCE($6, '全部设备'),
+                 COALESCE($7, '全天'), COALESCE($8, ''), COALESCE($9, TRUE))
          RETURNING *",
     )
     .bind(map_id)

@@ -62,8 +62,17 @@ class RobotBackend(ABC):
         """执行一个技能 / 预置动作。"""
 
     def skills(self) -> list[dict[str, Any]]:
-        """可用技能目录：[{name, description, tags}]，上报给服务器供前端展示。"""
+        """可用技能目录：[{name, description, tags, motion}]，上报给服务器供前端展示。
+        motion=True 表示会让设备运动（急停中前端禁用，智能体不得设为自动执行）。"""
         return []
+
+    def sensors(self) -> dict[str, Any] | None:
+        """传感器描述 {lidar, cameras[{name, detail, health, hz}], topics[...]}，前端感知页展示。"""
+        return None
+
+    async def pointcloud(self) -> list[tuple[float, float]] | None:
+        """当前点云的二维投影（米，机器人坐标系 +y 朝前、+x 朝右）；不支持返回 None。"""
+        return None
 
     @abstractmethod
     async def telemetry(self) -> Telemetry: ...
