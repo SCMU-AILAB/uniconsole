@@ -154,6 +154,8 @@ class ShellScaffold extends ConsumerWidget {
             go('agent'),
         const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
             go('settings'),
+        const SingleActivator(LogicalKeyboardKey.comma, control: true): () =>
+            go('settings'),
         const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () =>
             showCommandPalette(context),
         const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
