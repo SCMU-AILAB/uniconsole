@@ -28,6 +28,10 @@ ssh yaoyifeng@192.168.0.239 journalctl -u uniconsole-server -f   # 看日志
 
 服务器上的 `.env`（数据库密码、JWT 密钥、初始管理员密码）只在服务器上，不进仓库、不会被 deploy 覆盖。
 
+公网：frp 把 `1.13.195.109:8800` 映射到服务器的 8800（`frpc-uniconsole.service`，配置见
+`deploy/frpc-uniconsole.toml.example`）。**用 IP 访问**：`silencecf.me` 未备案，腾讯云会把域名的 HTTP 请求
+302 到拦截页。目前是明文 HTTP，上线前需要 HTTPS（备案域名 + 证书，或改用境外中转）。
+
 ## 结构（Cargo workspace）
 
 依赖方向：`domain` ← `protocol` / `auth` ← `server`。底层 crate 不得反向依赖上层。

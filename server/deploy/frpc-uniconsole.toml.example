@@ -1,0 +1,12 @@
+# 公网映射：服务器上 /etc/frp/frpc-uniconsole.toml（独立的 frpc-uniconsole.service，
+# 与原有 frpc.service 互不影响）。serverAddr / serverPort / auth.token 与原 /etc/frp/frpc.toml 相同。
+serverAddr = "1.13.195.109"
+serverPort = 6001
+auth.token = "<与 /etc/frp/frpc.toml 相同>"
+
+[[proxies]]
+name = "uniconsole-api"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 8800
+remotePort = 8800
