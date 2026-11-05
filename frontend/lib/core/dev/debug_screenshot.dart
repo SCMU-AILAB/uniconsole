@@ -66,6 +66,14 @@ String? get debugInitialRoute {
   return v == null || v.isEmpty ? null : v;
 }
 
+/// 用 mock 登录（不连服务器）：截图时，或 debug 下设置 `UNICONSOLE_MOCK_AUTH=1`。
+bool get debugMockAuth {
+  if (!kDebugMode || kIsWeb) return false;
+  final env = Platform.environment;
+  return env['UNICONSOLE_MOCK_AUTH'] == '1' ||
+      (env['UNICONSOLE_SCREENSHOT'] ?? '').isNotEmpty;
+}
+
 /// 仅 debug：`UNICONSOLE_SIGNED_OUT=1` 以未登录状态启动（截图登录页）。
 bool get debugSignedOut {
   if (!kDebugMode || kIsWeb) return false;

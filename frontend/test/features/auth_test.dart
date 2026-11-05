@@ -123,4 +123,15 @@ void main() {
       }
     });
   }
+
+  testWidgets('深链 uniconsole://invite/<token> 打开邀请页', (tester) async {
+    await open(tester, location: '/login', signedIn: false);
+    final router = GoRouter.of(tester.element(find.byType(LoginPage)));
+    router.routeInformationProvider.didPushRouteInformation(
+      RouteInformation(uri: Uri.parse('uniconsole://invite/demo')),
+    );
+    await settle(tester);
+    expect(find.text('为 王宁（@wangning）设置登录密码'), findsOneWidget);
+    await close(tester);
+  });
 }

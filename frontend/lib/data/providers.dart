@@ -27,6 +27,9 @@ final fleetRepositoryProvider = Provider<FleetRepository>(
 final leaseRepositoryProvider = Provider<LeaseRepository>(
   (ref) => ref.watch(mockWorldProvider).leases,
 );
+
+/// 登录与会话。应用启动时 override 为 [LiveAuthRepository]（真实后端）；
+/// 测试与截图默认用 mock。
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => ref.watch(mockWorldProvider).auth,
 );
@@ -140,9 +143,13 @@ final membersProvider = StreamProvider<List<Member>>(
 final authSessionProvider = StreamProvider<AuthSession?>(
   (ref) => ref.watch(authRepositoryProvider).watchSession(),
 );
-final currentUserProvider = StreamProvider<Member>(
-  (ref) => ref.watch(memberRepositoryProvider).watchCurrentUser(),
-);
+
+/// 当前成员：真实登录时来自服务端（登录返回 / `GET /auth/me`），mock 登录时来自 mock 世界。
+final currentUserProvider = StreamProvider<Member>((ref) {
+  final member = ref.watch(authSessionProvider).value?.member;
+  if (member != null) return Stream.value(member);
+  return ref.watch(memberRepositoryProvider).watchCurrentUser();
+});
 final auditProvider = StreamProvider<List<AuditEntry>>(
   (ref) => ref.watch(memberRepositoryProvider).watchAudit(),
 );

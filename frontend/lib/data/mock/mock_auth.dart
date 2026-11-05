@@ -194,7 +194,7 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<InviteInfo> invite(String token) async {
+  Future<InviteInfo> invite(String token, {String? server}) async {
     await Future<void>.delayed(latency);
     final i = _requireInvite(token);
     final m = i.memberId == null ? null : world.members.member(i.memberId!);
@@ -207,7 +207,11 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthSession> acceptInvite(String token, String password) async {
+  Future<AuthSession> acceptInvite(
+    String token,
+    String password, {
+    String? server,
+  }) async {
     final problem = passwordProblem(password);
     if (problem != null) throw AuthException('bad_request', problem);
     await Future<void>.delayed(latency);

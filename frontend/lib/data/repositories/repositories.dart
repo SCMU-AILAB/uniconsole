@@ -292,10 +292,15 @@ abstract interface class AuthRepository {
   Future<void> logout();
 
   /// `GET /auth/invites/{token}`；无效或过期抛 `not_found`。
-  Future<InviteInfo> invite(String token);
+  /// 邀请链接不带服务器地址，[server] 为空时用 [lastServer]。
+  Future<InviteInfo> invite(String token, {String? server});
 
   /// `POST /auth/invites/{token}/accept {password}`：设置密码并直接登录。
-  Future<AuthSession> acceptInvite(String token, String password);
+  Future<AuthSession> acceptInvite(
+    String token,
+    String password, {
+    String? server,
+  });
 }
 
 /// 成员与权限（API §1 认证与成员）。违反规则时抛 [MemberException]。

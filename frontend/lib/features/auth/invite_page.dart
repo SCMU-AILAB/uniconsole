@@ -13,19 +13,24 @@ import 'auth_widgets.dart';
 /// 邀请页（深链 `uniconsole://invite/<token>` → `/invite/<token>`）：
 /// 先 `GET /auth/invites/{token}` 显示「为 林悦（@linyue）设置密码」，
 /// 再 `accept`，成功即已登录，进入设备总览。
+///
+/// 邀请链接里没有服务器地址：优先用地址里的 `?server=`，其次是上次登录的服务器；
+/// 都没有（新装的应用）时先请对方填写服务器地址。
 class InvitePage extends ConsumerStatefulWidget {
-  const InvitePage({super.key, required this.token});
+  const InvitePage({super.key, required this.token, this.server});
 
   final String token;
+  final String? server;
 
   @override
   ConsumerState<InvitePage> createState() => _InvitePageState();
 }
 
 class _InvitePageState extends ConsumerState<InvitePage> {
-  late final Future<InviteInfo> _info = ref
-      .read(authRepositoryProvider)
-      .invite(widget.token);
+  late String _server =
+      widget.server ?? ref.read(authRepositoryProvider).lastServer;
+  late Future<InviteInfo>? _info = _server.trim().isEmpty ? null : _load();
+  final _serverField = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   final _confirmFocus = FocusNode();
@@ -39,8 +44,25 @@ class _InvitePageState extends ConsumerState<InvitePage> {
     _confirm.dispose();
     _confirmFocus.dispose();
     _handle.dispose();
+    _serverField.dispose();
     super.dispose();
   }
+
+  Future<InviteInfo> _load() =>
+      ref.read(authRepositoryProvider).invite(widget.token, server: _server);
+
+  void _useServer() {
+    if (_serverField.text.trim().isEmpty) return;
+    setState(() {
+      _server = _serverField.text.trim();
+      _info = _load();
+    });
+  }
+
+  void _changeServer() => setState(() {
+    _serverField.text = _server;
+    _info = null;
+  });
 
   Future<void> _submit() async {
     if (_busy) return;
@@ -56,7 +78,7 @@ class _InvitePageState extends ConsumerState<InvitePage> {
     try {
       await ref
           .read(authRepositoryProvider)
-          .acceptInvite(widget.token, _password.text);
+          .acceptInvite(widget.token, _password.text, server: _server);
       TextInput.finishAutofillContext();
       if (mounted) context.go(Routes.devices);
     } on AuthException catch (e) {
@@ -75,8 +97,40 @@ class _InvitePageState extends ConsumerState<InvitePage> {
     final t = context.type;
     final mobile = LayoutSize.ofContext(context).isMobile;
 
+    final info = _info;
+    if (info == null) {
+      return AuthScaffold(
+        title: '设置密码',
+        subtitle: '先填写管理员告诉你的服务器地址',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AuthField(
+              label: '服务器',
+              child: AppTextField(
+                hint: 'console.example.com',
+                semanticLabel: '服务器地址',
+                controller: _serverField,
+                autofocus: !mobile,
+                mobile: mobile,
+                keyboardType: TextInputType.url,
+                onSubmitted: (_) => _useServer(),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.x5),
+            PrimaryButton(
+              label: '继续',
+              size: ButtonSize.large,
+              expand: true,
+              onPressed: _useServer,
+            ),
+          ],
+        ),
+      );
+    }
+
     return FutureBuilder<InviteInfo>(
-      future: _info,
+      future: info,
       builder: (context, snap) {
         final info = snap.data;
         if (snap.hasError) {
@@ -92,6 +146,15 @@ class _InvitePageState extends ConsumerState<InvitePage> {
                   message: e is AuthException ? e.message : '无法打开邀请链接',
                 ),
                 const SizedBox(height: AppSpacing.x5),
+                if (widget.server == null) ...[
+                  PrimaryButton(
+                    label: '更换服务器地址',
+                    size: ButtonSize.large,
+                    expand: true,
+                    onPressed: _changeServer,
+                  ),
+                  const SizedBox(height: AppSpacing.x2),
+                ],
                 SecondaryButton(
                   label: '前往登录',
                   size: ButtonSize.large,

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'member.dart';
+
 /// 登录会话（API `POST /auth/login` 的 `LoginResponse`）。
 @immutable
 class AuthSession {
@@ -9,6 +11,7 @@ class AuthSession {
     required this.memberId,
     required this.server,
     required this.expiresAt,
+    this.member,
   });
 
   final String token;
@@ -18,6 +21,19 @@ class AuthSession {
   /// 服务器地址（如 `console.example.com`），自托管部署各不相同。
   final String server;
   final DateTime expiresAt;
+
+  /// 登录返回的当前成员（`LoginResponse.member` / `GET /auth/me`）。
+  /// mock 会话为 null，当前成员由 mock 世界提供。
+  final Member? member;
+
+  AuthSession copyWith({Member? member}) => AuthSession(
+    token: token,
+    sessionId: sessionId,
+    memberId: memberId,
+    server: server,
+    expiresAt: expiresAt,
+    member: member ?? this.member,
+  );
 }
 
 /// 邀请页信息（`GET /auth/invites/{token}`）。

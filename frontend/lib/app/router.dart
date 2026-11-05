@@ -44,6 +44,15 @@ GoRouter buildRouter({
   );
 
   String? guard(GoRouterState state) {
+    // 深链 `uniconsole://invite/<token>`：host 是第一段路径。
+    if (state.uri.scheme == 'uniconsole' && state.uri.host.isNotEmpty) {
+      return Uri(
+        path: '/${state.uri.host}${state.uri.path}',
+        queryParameters: state.uri.queryParameters.isEmpty
+            ? null
+            : state.uri.queryParameters,
+      ).toString();
+    }
     final path = state.uri.path;
     if (path == '/') return Routes.devices;
     if (auth == null) return null;
@@ -78,7 +87,10 @@ GoRouter buildRouter({
         path: '/invite/:token',
         pageBuilder: (context, state) => NoTransitionPage(
           key: state.pageKey,
-          child: InvitePage(token: state.pathParameters['token']!),
+          child: InvitePage(
+            token: state.pathParameters['token']!,
+            server: state.uri.queryParameters['server'],
+          ),
         ),
       ),
       ShellRoute(
