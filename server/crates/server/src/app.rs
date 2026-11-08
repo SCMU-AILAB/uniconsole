@@ -59,6 +59,7 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
         safety: Arc::new(SafetyService::load(&db).await?),
         alerts: Arc::new(AlertEngine::load(&db).await?),
         missions: Arc::new(MissionRunner::default()),
+        fleet_player: Arc::default(),
         telemetry_tx: spawn_telemetry_writer(db.clone()),
         login_limiter: Arc::new(LoginLimiter::default()),
         hub,

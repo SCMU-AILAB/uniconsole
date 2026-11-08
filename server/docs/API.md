@@ -264,8 +264,10 @@ FleetSession = {
   "formation": "line|column|v|grid", "spacing": 1.2, "preset_id": "… | null",
   "control_mode": "领队-跟随", "clock_sync": "PTP · 局域网", "lost_link_action": "原地趴下",
   "clock_skew_ms": null,                                      // 未接入 PTP 统计前为 null
-  "timeline": [{"device_id": "go2-05", "start_ms": 0, "end_ms": 2000, "action": "stand", "kind": "pose|move|act"}],
+  "timeline": [{"device_id": "go2-05", "start_ms": 0, "end_ms": 2000, "action": "站立", "kind": "pose|move|act",
+                "command": null}],                            // command 可选：协议 Command 对象，填了就不再按 action 翻译
   "timeline_length_ms": 16000,                                // 服务端按 timeline 的最大 end_ms 计算
+  "playback_started_at": "… | null",                          // 时间轴播放中：播放头 = now - playback_started_at
   "last_receipt": Receipt | null,
   "active": true, "paused": false, "created_at": "…", "updated_at": "…"
 }
@@ -281,6 +283,8 @@ Receipt = {"label": "同步站立", "sent_at": "…", "schedule_offset_ms": 200,
 | POST | /fleet-sessions/{id}/start | 开始：一次性接管所有设备的控制权 |
 | POST | /fleet-sessions/{id}/stop | 结束：全部停止并释放控制权 |
 | POST | /fleet-sessions/{id}/commands | `{command, device_ids?, label?}` → `Receipt`（同时存为 `last_receipt`） |
+| POST | /fleet-sessions/{id}/play | `{from_ms?}`（可不带 body）→ `FleetSession`：按时间轴下发动作，仅发起人；已在播放 409、急停中 423、有无法识别的动作 400 |
+| POST | /fleet-sessions/{id}/play/stop | 中止播放，所有设备停止 → `FleetSession` |
 | GET | /fleet-presets | `[{id, name, device_ids, formation, spacing, created_by, created_at}]` |
 | POST | /fleet-presets | `{name, session_id}`（把会话保存为预设）或 `{name, device_ids, formation?, spacing?}` |
 | DELETE | /fleet-presets/{id} | |
@@ -291,7 +295,14 @@ Receipt = {"label": "同步站立", "sent_at": "…", "schedule_offset_ms": 200,
 - 全局急停时所有进行中的会话 `paused = true`，此时运动类同步指令 409；急停解除后需要 `PATCH {paused: false}` 恢复（急停中恢复 423）。
 - `schedule_offset_ms`：各设备在同一时刻执行时相对发出时刻的偏移，取最慢回执向上取整到 50 ms。
 - 变化推送 `changed: fleet_sessions` / `changed: fleet_presets`。
-- TODO：timeline 执行器、编队保持、PTP 时钟偏差统计（`clock_skew_ms`）。
+- **时间轴播放**：`action` 按 `kind` 翻译——
+  `pose`：站立 / 趴下 / 平衡站立 / 行走 / 爬楼梯 / 阻尼 / 恢复站立（或 stand、down 等模式名）→ `set_mode`；
+  `move`：「前进 3 m」「后退 1.5 m」「左移 / 右移 1 m」「左转 / 右转 90°」→ 块内以 10 Hz 下发 `move`，速度 = 距离 / 块时长
+  （仍受安全策略限幅，超限时走不满距离），块结束 `stop`；
+  `act`：设备技能目录（`meta.skills`）里 `name` 或 `description` 等于 `action` 的技能（「打招呼」→ hello），英文标识符直接当技能名。
+  播放开始时推 `changed: fleet_sessions`（`playback_started_at` 有值），结束 / 中止后清空，并把每台设备的结果写入
+  `last_receipt`（`label: "时间轴执行"`，失败的 `message` 写明是哪个动作）。全局急停、会话结束都会中止播放。
+- TODO：编队保持、PTP 时钟偏差统计（`clock_skew_ms`）。
 
 ### 安全（Safety.dc.html）
 

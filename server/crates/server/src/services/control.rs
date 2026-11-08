@@ -244,6 +244,7 @@ pub async fn set_global_estop(st: &AppState, user: &AuthUser, active: bool) -> A
         events::record(st, &id, text, if active { "critical" } else { "success" }).await;
     }
     if active {
+        st.fleet_player.stop_all();
         let paused = sqlx::query(
             "UPDATE fleet_sessions SET paused = TRUE, updated_at = now() WHERE active AND NOT paused",
         )

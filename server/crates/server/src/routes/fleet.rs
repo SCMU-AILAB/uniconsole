@@ -1,6 +1,6 @@
 //! 多机联调（Fleet.dc.html）。会话开始时一次性获取所有参与设备的租约，
 //! 同步指令向所有设备并发下发并汇总回执。
-//! TODO：时间轴（timeline）执行器、编队保持控制、PTP 时钟偏差统计。
+//! 时间轴播放见 `services::fleet_timeline`。TODO：编队保持控制、PTP 时钟偏差统计。
 
 use std::time::Instant;
 
@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::{
     auth::{AuthUser, Perm},
     error::{AppError, AppResult},
+    extract::MaybeJson,
     models::{FleetPreset, FleetSession, Formation, Role},
     protocol::{Command, MotionMode, ServerEvent, SpeedLevel},
     services::{
@@ -238,6 +239,7 @@ async fn stop_devices(st: &AppState, ids: &[String]) {
 }
 
 async fn end_session(st: &AppState, s: &FleetSession, by: &str) -> AppResult<()> {
+    st.fleet_player.stop(s.id);
     stop_devices(st, &s.device_ids).await;
     if let Some(start) = s.started_at
         && !s.device_ids.is_empty()
@@ -517,6 +519,65 @@ pub async fn command(
         .await?;
     changed(&st, id);
     Ok(Json(receipt))
+}
+
+// ───────── 时间轴播放 ─────────
+
+#[derive(Deserialize, Default)]
+pub struct PlayReq {
+    /// 从时间轴的第几毫秒开始（拖动播放头后播放）
+    #[serde(default)]
+    pub from_ms: u64,
+}
+
+/// POST /fleet-sessions/{id}/play `{from_ms?}`：按时间轴向各设备下发动作
+pub async fn play(
+    State(st): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    body: MaybeJson<PlayReq>,
+) -> AppResult<Json<FleetSession>> {
+    let s = load(&st, id).await?;
+    // 播放以操作者身份下发运动指令，而会话的控制权属于发起人
+    if s.owner_id != user.id {
+        return Err(AppError::forbidden("只有会话发起人可以播放动作编排"));
+    }
+    let req = body.into_inner().unwrap_or_default();
+    st.fleet_player.play(&st, &user, &s, req.from_ms).await?;
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Control,
+        format!("播放{}的动作编排", session_label(&s)),
+        session_label(&s),
+        json!({ "from_ms": req.from_ms }),
+    )
+    .await;
+    Ok(Json(load(&st, id).await?))
+}
+
+/// POST /fleet-sessions/{id}/play/stop：中止播放，所有设备停止
+pub async fn stop_play(
+    State(st): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<FleetSession>> {
+    let s = load(&st, id).await?;
+    ensure_owner(&user, &s)?;
+    if st.fleet_player.is_playing(id) {
+        st.fleet_player.stop(id);
+        stop_devices(&st, &s.device_ids).await;
+        audit::record(
+            &st,
+            &user,
+            audit::Kind::Control,
+            format!("中止{}的动作编排", session_label(&s)),
+            session_label(&s),
+            json!({}),
+        )
+        .await;
+    }
+    Ok(Json(load(&st, id).await?))
 }
 
 // ───────── 预设 ─────────

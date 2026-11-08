@@ -115,6 +115,8 @@ pub fn router(state: AppState) -> Router {
         .route("/fleet-sessions/{id}/start", post(fleet::start))
         .route("/fleet-sessions/{id}/stop", post(fleet::stop))
         .route("/fleet-sessions/{id}/commands", post(fleet::command))
+        .route("/fleet-sessions/{id}/play", post(fleet::play))
+        .route("/fleet-sessions/{id}/play/stop", post(fleet::stop_play))
         .route(
             "/fleet-presets",
             get(fleet::list_presets).post(fleet::create_preset),

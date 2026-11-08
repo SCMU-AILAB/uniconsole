@@ -293,6 +293,8 @@ pub struct FleetSession {
     pub active: bool,
     pub paused: bool,
     pub started_at: Option<DateTime<Utc>>,
+    /// 时间轴播放起点（已减去起播偏移）；None = 未在播放
+    pub playback_started_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -322,6 +324,7 @@ impl Serialize for FleetSession {
             last_receipt: Option<&'a Value>,
             active: bool,
             paused: bool,
+            playback_started_at: Option<DateTime<Utc>>,
             created_at: DateTime<Utc>,
             updated_at: DateTime<Utc>,
         }
@@ -355,6 +358,7 @@ impl Serialize for FleetSession {
             last_receipt: self.last_receipt.as_ref(),
             active: self.active,
             paused: self.paused,
+            playback_started_at: self.playback_started_at,
             created_at: self.created_at,
             updated_at: self.updated_at,
         }
