@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::{
     auth::{AuthUser, Perm},
     error::AppResult,
+    extract::MaybeJson,
     models::{Lease, LeaseHolderKind, LeaseRequest},
     protocol::ServerEvent,
     services::{
@@ -88,10 +89,10 @@ pub async fn acquire(
     State(st): State<AppState>,
     user: AuthUser,
     Path(id): Path<String>,
-    body: Option<Json<AcquireReq>>,
+    body: MaybeJson<AcquireReq>,
 ) -> AppResult<Json<AcquireOutcome>> {
     access::require_device(&st.db, &user, Perm::HoldLease, &id).await?;
-    let req = body.map(|Json(b)| b).unwrap_or_default();
+    let req = body.into_inner().unwrap_or_default();
     let term = st.safety.policies().lease_term_secs;
     let reason = req.reason.clone();
     let out = st
@@ -184,7 +185,7 @@ pub async fn release(
     user: AuthUser,
     Path(id): Path<String>,
     Query(q): Query<ReleaseQuery>,
-    body: Option<Json<ReleaseBody>>,
+    body: MaybeJson<ReleaseBody>,
 ) -> AppResult<StatusCode> {
     let label = audit::device_label(&st, &id).await;
     if !q.force {
@@ -211,7 +212,7 @@ pub async fn release(
     }
     let reason = q
         .reason
-        .or(body.and_then(|Json(b)| b.reason))
+        .or(body.into_inner().and_then(|b| b.reason))
         .filter(|r| !r.trim().is_empty())
         .unwrap_or_else(|| "未填写原因".into());
     let lease = st.leases.release(&id, None).await?;

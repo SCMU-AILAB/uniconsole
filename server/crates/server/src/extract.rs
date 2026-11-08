@@ -178,3 +178,72 @@ mod tests {
         assert_eq!(decode_header(b"iOS 1.0"), "iOS 1.0");
     }
 }
+
+/// 可选的 JSON 请求体：没有 body 或 body 为空时为 None（无论有没有 `Content-Type: application/json`）。
+/// axum 的 `Option<Json<T>>` 在带了 JSON Content-Type 但 body 为空时会返回 400，
+/// 而很多 HTTP 客户端（包括前端的 ApiClient）对 DELETE / 无参 POST 也带这个头。
+pub struct MaybeJson<T>(pub Option<T>);
+
+impl<S, T> axum::extract::FromRequest<S> for MaybeJson<T>
+where
+    S: Send + Sync,
+    T: serde::de::DeserializeOwned,
+{
+    type Rejection = AppError;
+
+    async fn from_request(req: axum::extract::Request, state: &S) -> Result<Self, AppError> {
+        let bytes = axum::body::Bytes::from_request(req, state)
+            .await
+            .map_err(|e| AppError::bad_request(e.body_text()))?;
+        if bytes.iter().all(u8::is_ascii_whitespace) {
+            return Ok(Self(None));
+        }
+        serde_json::from_slice(&bytes)
+            .map(|v| Self(Some(v)))
+            .map_err(|e| AppError::bad_request(format!("请求体不是合法的 JSON：{e}")))
+    }
+}
+
+impl<T> MaybeJson<T> {
+    pub fn into_inner(self) -> Option<T> {
+        self.0
+    }
+}
+
+#[cfg(test)]
+mod maybe_json_tests {
+    use axum::{body::Body, extract::FromRequest, http::Request};
+
+    use super::MaybeJson;
+
+    #[derive(serde::Deserialize, Debug)]
+    struct B {
+        reason: Option<String>,
+    }
+
+    async fn parse(body: &'static str, json_header: bool) -> Result<Option<B>, super::AppError> {
+        let mut r = Request::builder().method("DELETE").uri("/x");
+        if json_header {
+            r = r.header("content-type", "application/json");
+        }
+        MaybeJson::<B>::from_request(r.body(Body::from(body)).unwrap(), &())
+            .await
+            .map(MaybeJson::into_inner)
+    }
+
+    #[tokio::test]
+    async fn empty_body_is_none() {
+        assert!(parse("", true).await.unwrap().is_none());
+        assert!(parse("", false).await.unwrap().is_none());
+        assert_eq!(
+            parse(r#"{"reason":"x"}"#, true)
+                .await
+                .unwrap()
+                .unwrap()
+                .reason
+                .as_deref(),
+            Some("x")
+        );
+        assert!(parse("{", true).await.is_err());
+    }
+}
