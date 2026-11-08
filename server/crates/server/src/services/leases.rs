@@ -532,6 +532,67 @@ impl LeaseService {
         Ok(())
     }
 
+    /// 自动任务获取一台设备：空闲、已过期或本来就由该任务持有时成功，否则 409
+    pub async fn acquire_for_task(
+        &self,
+        task_id: Uuid,
+        source: &str,
+        device_id: &str,
+    ) -> AppResult<Lease> {
+        let lease: Option<Lease> = sqlx::query_as(
+            "INSERT INTO leases (device_id, holder_kind, task_id, source, expires_at)
+             VALUES ($1, 'task', $2, $3, NULL)
+             ON CONFLICT (device_id) DO UPDATE SET holder_kind = 'task', holder_id = NULL,
+                task_id = EXCLUDED.task_id, session_id = NULL, source = EXCLUDED.source,
+                acquired_at = CASE WHEN leases.task_id = EXCLUDED.task_id
+                                   THEN leases.acquired_at ELSE now() END,
+                expires_at = NULL
+             WHERE (leases.expires_at IS NOT NULL AND leases.expires_at <= now())
+                OR leases.task_id = EXCLUDED.task_id
+             RETURNING *",
+        )
+        .bind(device_id)
+        .bind(task_id)
+        .bind(source)
+        .fetch_optional(&self.db)
+        .await?;
+        let Some(lease) = lease else {
+            let holder: String = sqlx::query_scalar(
+                "SELECT COALESCE(m.name, l.source) FROM leases l LEFT JOIN members m ON m.id = l.holder_id
+                 WHERE l.device_id = $1",
+            )
+            .bind(device_id)
+            .fetch_optional(&self.db)
+            .await?
+            .unwrap_or_default();
+            return Err(AppError::ConflictDevices {
+                message: format!("设备正被「{holder}」控制"),
+                device_ids: vec![device_id.to_owned()],
+            });
+        };
+        self.changed(device_id, Some(lease.clone())).await;
+        Ok(lease)
+    }
+
+    /// 该任务是否仍持有设备（可能被管理者收回或转交）
+    pub fn is_task_holder(&self, device_id: &str, task_id: Uuid) -> bool {
+        self.current(device_id)
+            .is_some_and(|l| l.holder_kind == LeaseHolderKind::Task && l.task_id == Some(task_id))
+    }
+
+    /// 释放任务持有的全部租约
+    pub async fn release_task(&self, task_id: Uuid) -> AppResult<()> {
+        let ids: Vec<String> =
+            sqlx::query_scalar("DELETE FROM leases WHERE task_id = $1 RETURNING device_id")
+                .bind(task_id)
+                .fetch_all(&self.db)
+                .await?;
+        for id in ids {
+            self.changed(&id, None).await;
+        }
+        Ok(())
+    }
+
     /// 某成员当前持有的单机租约
     pub fn held_by(&self, user: Uuid) -> Vec<Lease> {
         self.cache

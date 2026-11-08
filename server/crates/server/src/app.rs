@@ -27,6 +27,7 @@ use crate::{
         control::{self, Actor},
         events,
         leases::LeaseService,
+        missions::{self, MissionRunner},
         safety::SafetyService,
         sessions::LoginLimiter,
     },
@@ -57,6 +58,7 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
         leases: Arc::new(LeaseService::load(db.clone(), hub.clone()).await?),
         safety: Arc::new(SafetyService::load(&db).await?),
         alerts: Arc::new(AlertEngine::load(&db).await?),
+        missions: Arc::new(MissionRunner::default()),
         telemetry_tx: spawn_telemetry_writer(db.clone()),
         login_limiter: Arc::new(LoginLimiter::default()),
         hub,
@@ -79,6 +81,7 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
     let state = build_state(cfg.clone()).await?;
     tokio::spawn(lease_sweeper(state.clone()));
     tokio::spawn(retention_cleaner(state.clone()));
+    tokio::spawn(missions::scheduler(state.clone()));
 
     let listener = tokio::net::TcpListener::bind(cfg.bind_addr).await?;
     tracing::info!("UniConsole 服务已启动：http://{}", cfg.bind_addr);

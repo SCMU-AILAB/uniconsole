@@ -388,7 +388,8 @@ Mission = {"id": "uuid", "name": "B 区巡检", "map_id": "b2",
            "schedule": "每天 09:00、14:00",       // 给人看的字符串
            "state": "running|scheduled|paused", "completed": 3, "loop": true,
            "waypoints": [{"name": "P1 · 配电柜", "x": 10.5, "y": 6.2, "yaw": 1.57, "stay_secs": 30, "retries": 2,
-                          "actions": [{"name": "拍照", "detail": "前置相机 · 存档"}]}],
+                          "actions": [{"name": "拍照", "detail": "前置相机 · 存档"},
+                                      {"name": "挥手", "detail": "", "skill": "hello", "params": {}}]}],   // 带 skill 的动作到达后执行
            "created_by": "…", "created_at": "…", "updated_at": "…"}
 ScheduleEntry = {"id": 1, "device_id": "go2-01", "start": "…", "end": "…", "label": "B 区巡检",
                  "kind": "run|charge|other", "mission_id": "… | null"}
@@ -403,12 +404,27 @@ ScheduleEntry = {"id": 1, "device_id": "go2-01", "start": "…", "end": "…", "
 | POST | /maps/{id}/remap | 重新建图 → **501**（需要机器人端 SLAM） |
 | GET / POST | /missions | 新建只需 `{name, map_id}`，其余默认 |
 | GET / PATCH / DELETE | /missions/{id} | 运行 / 暂停 `{state}`；替换全部点位 `{waypoints}`；`{assignee, schedule, loop, completed}` |
-| GET | /schedule?date=YYYY-MM-DD | 当天（UTC）的排期 `ScheduleEntry[]` |
-| POST / DELETE | /schedule(/{id}) | 手动维护排期（调度器上线前） |
+| GET | /schedule?date=YYYY-MM-DD | 当天的排期 `ScheduleEntry[]`；日期按排期时区（`SCHEDULE_TZ_OFFSET_MINUTES`，默认北京时间），缺省今天 |
+| POST / DELETE | /schedule(/{id}) | 手动加 / 删排期（自动生成的排期也可以删，任务修改后会重新生成） |
 
 - 设备位置不放在地图里：用遥测的 `pose` + `map_id`（同一坐标系）。
 - 变化推送 `changed: maps` / `missions` / `schedule`。
-- TODO：任务调度器（按 schedule 触发、开始前自动获取租约、逐点下发并回写 `completed`，届时推 `changed: missions`）。
+
+**任务执行（服务端调度器）**：
+- **排期**：`schedule` 仍是给人看的字符串，服务端能识别「每天 / 工作日 / 周末 / 每周一、三、五 / 星期日」加若干 `HH:MM`
+  （如「每天 09:00、14:00」「工作日 08:30」），时刻按排期时区解释。到点时 `scheduled` 的任务自动变成 `running`；
+  `paused` 的任务不会被触发。识别不出时刻的任务只能手动运行（`PATCH {state: "running"}`）。
+  当天还没开始的运行会自动出现在 `GET /schedule` 里（`kind: run`），任务改动后重新生成。
+- **执行**：选设备（`assignee.device_id` 在线且未急停，否则 `backup_device_id`；`preset_id` 暂不支持）→ 以任务身份获取
+  控制权（`lease.holder_kind = task`）→ 从第 `completed` 个点位开始，逐点下发
+  `{"kind":"action","name":"navigate_to","params":{"map_id","x","y","yaw"}}`，机器人**到达后**回执（单点超时
+  `MISSION_STEP_TIMEOUT_SECS`，默认 600 s）→ 执行该点带 `skill` 的动作 → 停留 `stay_secs` → `completed + 1`，推 `changed: missions`。
+- 到达失败按 `retries` 重试，仍失败就跳过该点，并生成 warning 告警（`metric: mission_waypoint_failed`）。
+- 一轮结束：`loop = true` 从头再来；否则回到 `scheduled`、`completed = 0`。
+- **停止**：`PATCH {state: "paused" | "scheduled"}` 或删除任务时立即停止设备并释放控制权，`completed` 保留（暂停后再运行会从断点继续）。
+  急停、设备掉线、控制权被收回 / 被占用、没有可用设备时，任务自动变为 `paused`，设备事件和审计里写明原因，并给任务创建者发 `notice`。
+- 服务重启后，`running` 的任务从 `completed` 处继续。
+- 机器人端需要提供 `navigate_to` 技能（模拟机器人已提供；Go2Agent 尚未提供，真机上会回执失败 → 重试 → 跳过并告警）。
 
 ### 录制与回放（Replay.dc.html）
 

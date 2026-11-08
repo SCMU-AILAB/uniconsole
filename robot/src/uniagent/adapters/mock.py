@@ -1,5 +1,6 @@
 """模拟机器人：无需硬件即可联调服务器与前端。"""
 
+import asyncio
 import math
 import random
 import time
@@ -15,7 +16,12 @@ SKILLS = {
     "heart": "比心",
     "sit": "坐下",
     "dance1": "跳舞 1",
+    "navigate_to": "导航到地图点位（服务器任务调度使用）",
+    "say": "播报一段文字（对讲 TTS）",
 }
+# 模拟导航速度（米 / 秒）与单次最长耗时，避免测试等待太久
+NAV_SPEED = 1.0
+NAV_MAX_SECS = 3.0
 
 
 class MockBackend(RobotBackend):
@@ -91,6 +97,22 @@ class MockBackend(RobotBackend):
         if name not in SKILLS:
             raise AdapterError(f"不支持的动作 {name}")
         self.calls.append(("action", name))
+        if name == "navigate_to":
+            await self._navigate(params)
+        elif name == "say" and not str(params.get("text", "")).strip():
+            raise AdapterError("播报内容为空")
+
+    async def _navigate(self, params: dict[str, Any]) -> None:
+        """模拟导航：按距离等待一段时间后直接到达目标点。"""
+        try:
+            x, y = float(params["x"]), float(params["y"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise AdapterError("navigate_to 需要 x、y") from e
+        p = self._pose
+        dist = math.hypot(x - p.x, y - p.y)
+        await asyncio.sleep(min(NAV_MAX_SECS, dist / NAV_SPEED))
+        p.x, p.y = x, y
+        p.yaw = float(params.get("yaw", p.yaw))
 
     async def telemetry(self) -> Telemetry:
         now = time.monotonic()

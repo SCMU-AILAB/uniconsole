@@ -7,7 +7,8 @@ use crate::{
     config::Config,
     realtime::{Hub, TelemetrySample},
     services::{
-        alerting::AlertEngine, leases::LeaseService, safety::SafetyService, sessions::LoginLimiter,
+        alerting::AlertEngine, leases::LeaseService, missions::MissionRunner,
+        safety::SafetyService, sessions::LoginLimiter,
     },
 };
 
@@ -20,6 +21,7 @@ pub struct AppState {
     pub leases: Arc<LeaseService>,
     pub safety: Arc<SafetyService>,
     pub alerts: Arc<AlertEngine>,
+    pub missions: Arc<MissionRunner>,
     pub telemetry_tx: mpsc::Sender<TelemetrySample>,
     pub login_limiter: Arc<LoginLimiter>,
 }

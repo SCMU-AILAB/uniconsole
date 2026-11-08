@@ -27,6 +27,10 @@ pub struct Config {
     pub api_token_ttl_days: i64,
     /// WebRTC ICE 服务器（GET /webrtc/ice-servers），JSON 数组
     pub ice_servers: serde_json::Value,
+    /// 任务单个点位的导航超时（机器人到达后才回执）
+    pub mission_step_timeout_secs: u64,
+    /// 任务排期字符串里的时刻按哪个时区解释（相对 UTC 的分钟数，默认 +480 北京时间）
+    pub schedule_tz_offset_minutes: i32,
     /// 首次启动时若没有任何成员则创建管理员
     pub bootstrap_admin: Option<(String, String)>,
 }
@@ -80,6 +84,8 @@ impl Config {
                 }
                 _ => serde_json::json!([]),
             },
+            mission_step_timeout_secs: var("MISSION_STEP_TIMEOUT_SECS", 600)?,
+            schedule_tz_offset_minutes: var("SCHEDULE_TZ_OFFSET_MINUTES", 480)?,
             bootstrap_admin,
         })
     }

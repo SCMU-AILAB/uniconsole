@@ -139,12 +139,23 @@ pub async fn execute(
     st: &AppState,
     actor: Actor<'_>,
     device_id: &str,
-    mut cmd: Command,
+    cmd: Command,
     wait_ack: bool,
+) -> AppResult<CommandResult> {
+    let wait = wait_ack.then(|| Duration::from_millis(st.cfg.command_timeout_ms));
+    execute_with_timeout(st, actor, device_id, cmd, wait).await
+}
+
+/// 同 [`execute`]，回执超时由调用方决定（导航这类长指令，机器人到达后才回执）
+pub async fn execute_with_timeout(
+    st: &AppState,
+    actor: Actor<'_>,
+    device_id: &str,
+    mut cmd: Command,
+    wait: Option<Duration>,
 ) -> AppResult<CommandResult> {
     let log_it = !matches!(cmd, Command::Move { .. });
     let started = Instant::now();
-    let wait = wait_ack.then(|| Duration::from_millis(st.cfg.command_timeout_ms));
 
     let result = match precheck(st, actor, device_id, &mut cmd).await {
         Ok(()) => st.hub.dispatch(device_id, cmd.clone(), wait).await,

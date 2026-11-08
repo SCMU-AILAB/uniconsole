@@ -194,3 +194,17 @@ def test_mock_skills_sensors_pointcloud():
     assert len(pts) == 720 and all(abs(x) <= 4.1 and abs(y) <= 3.1 for x, y in pts)
     t = run(b.telemetry())
     assert t.map_id == "b2" and len(t.extra["acc"]) == 3
+
+
+def test_mock_navigate_and_say():
+    from uniagent.adapters import AdapterError
+
+    b = MockBackend()
+    run(b.action("navigate_to", {"map_id": "b2", "x": 1.0, "y": 0.5, "yaw": 1.57}))
+    t = run(b.telemetry())
+    assert (t.pose.x, t.pose.y) == (1.0, 0.5)
+    run(b.action("say", {"text": "请注意"}))
+    with pytest.raises(AdapterError):
+        run(b.action("say", {"text": " "}))
+    with pytest.raises(AdapterError):
+        run(b.action("navigate_to", {}))

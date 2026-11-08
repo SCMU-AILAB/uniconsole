@@ -1,12 +1,12 @@
 //! 地图与任务（Missions.dc.html）：地图、任务、今日排期。
-//! TODO：任务调度器（按 schedule 触发、开始前自动获取租约、逐点下发并回写 completed）。
+//! 任务的调度与执行见 `services::missions`；这里改完数据库后调用 `st.missions.sync` 让执行跟上。
 
 use axum::{
     Json,
     extract::{Path, Query, State},
     http::StatusCode,
 };
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -16,7 +16,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{Map, Mission, MissionState, ScheduleEntry},
     protocol::ServerEvent,
-    services::audit,
+    services::{audit, missions},
     state::AppState,
 };
 
@@ -232,6 +232,13 @@ fn missions_changed(st: &AppState, id: Uuid) {
     st.hub.publish(ServerEvent::changed("missions", Some(id)));
 }
 
+/// 任务改动后重新生成它今天的自动排期
+async fn replan(st: &AppState, id: Uuid) {
+    if let Err(e) = missions::plan_today(st, Some(id)).await {
+        tracing::warn!(error = %e, mission = %id, "生成今日排期失败");
+    }
+}
+
 pub async fn list(State(st): State<AppState>, user: AuthUser) -> AppResult<Json<Vec<Mission>>> {
     user.require(Perm::ViewDevice)?;
     Ok(Json(
@@ -320,6 +327,8 @@ pub async fn create(
     )
     .await;
     missions_changed(&st, m.id);
+    replan(&st, m.id).await;
+    st.missions.sync(&st, &m);
     Ok((StatusCode::CREATED, Json(m)))
 }
 
@@ -372,6 +381,8 @@ pub async fn update(
     };
     audit::record(&st, &user, audit::Kind::Config, action, &m.name, json!({})).await;
     missions_changed(&st, id);
+    replan(&st, id).await;
+    st.missions.sync(&st, &m);
     Ok(Json(m))
 }
 
@@ -381,6 +392,14 @@ pub async fn remove(
     Path(id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
     user.require(Perm::EditMaps)?;
+    st.missions.stop(id, true);
+    st.leases.release_task(id).await?;
+    sqlx::query(
+        "DELETE FROM schedule_entries WHERE auto AND mission_id = $1 AND starts_at > now()",
+    )
+    .bind(id)
+    .execute(&st.db)
+    .await?;
     let name: Option<String> =
         sqlx::query_scalar("DELETE FROM missions WHERE id = $1 RETURNING name")
             .bind(id)
@@ -404,7 +423,7 @@ pub async fn remove(
 
 #[derive(Deserialize)]
 pub struct ScheduleQuery {
-    /// YYYY-MM-DD（UTC 日期），缺省今天
+    /// YYYY-MM-DD（按 SCHEDULE_TZ_OFFSET_MINUTES 的本地日期），缺省今天
     pub date: Option<NaiveDate>,
 }
 
@@ -414,9 +433,8 @@ pub async fn schedule(
     Query(q): Query<ScheduleQuery>,
 ) -> AppResult<Json<Vec<ScheduleEntry>>> {
     user.require(Perm::ViewDevice)?;
-    let day = q.date.unwrap_or_else(|| Utc::now().date_naive());
-    let from: DateTime<Utc> = day.and_hms_opt(0, 0, 0).expect("midnight").and_utc();
-    let to = from + Duration::days(1);
+    let day = q.date.unwrap_or_else(|| missions::local_today(&st));
+    let (from, to) = missions::local_day_range(&st, day);
     Ok(Json(
         sqlx::query_as(
             "SELECT * FROM schedule_entries WHERE starts_at < $2 AND ends_at > $1 ORDER BY starts_at",
