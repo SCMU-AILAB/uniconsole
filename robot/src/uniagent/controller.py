@@ -106,7 +106,8 @@ class Controller:
             self.speed_level = cmd.level
             await self.backend.set_speed_level(cmd.level)
         elif isinstance(cmd, ActionCmd):
-            self._moving = False  # 技能接管运动，看门狗不应再发 stop 打断它
+            if is_motion(cmd):
+                self._moving = False  # 技能接管运动，看门狗不应再发 stop 打断它
             await self.backend.action(cmd.name, cmd.params or {})
         else:  # pragma: no cover
             raise CommandRejected(f"未知指令 {cmd!r}")

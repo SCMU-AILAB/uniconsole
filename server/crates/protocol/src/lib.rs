@@ -38,6 +38,9 @@ pub enum MotionMode {
     Recovery,
 }
 
+/// 不让机器人运动的技能（播报等）：不需要控制权，急停中也可以执行
+pub const NON_MOTION_ACTIONS: &[&str] = &["say"];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Command {
@@ -70,17 +73,21 @@ pub enum Command {
 
 impl Command {
     /// 会让机器人运动的指令：需要控制权且急停时被拒绝
-    /// 停止类指令（Stop / Estop / 阻尼）永远允许，任何人可触发。
+    /// 停止类指令（Stop / Estop / 阻尼）永远允许，任何人可触发；播报（`say`）不是运动。
+    /// 与 robot/src/uniagent/protocol.py 的 `is_motion` 保持一致。
     pub fn is_motion(&self) -> bool {
-        !matches!(
-            self,
-            Command::Stop
-                | Command::Estop { .. }
-                | Command::ReleaseEstop
-                | Command::SetMode {
-                    mode: MotionMode::Damp
-                }
-        )
+        match self {
+            Command::Action { name, .. } => !NON_MOTION_ACTIONS.contains(&name.as_str()),
+            _ => !matches!(
+                self,
+                Command::Stop
+                    | Command::Estop { .. }
+                    | Command::ReleaseEstop
+                    | Command::SetMode {
+                        mode: MotionMode::Damp
+                    }
+            ),
+        }
     }
 
     /// 按安全策略限幅
@@ -481,6 +488,20 @@ mod tests {
             .is_motion()
         );
         assert!(!Command::Stop.is_motion());
+        assert!(
+            !Command::Action {
+                name: "say".into(),
+                params: Value::Null
+            }
+            .is_motion()
+        );
+        assert!(
+            Command::Action {
+                name: "hello".into(),
+                params: Value::Null
+            }
+            .is_motion()
+        );
         assert!(!Command::Estop { drill: false }.is_motion());
         assert!(
             !Command::SetMode {

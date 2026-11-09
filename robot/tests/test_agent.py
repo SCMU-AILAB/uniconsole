@@ -227,3 +227,15 @@ def test_parse_webrtc_signaling():
     assert isinstance(msg, WebrtcOffer) and msg.streams == ["front"]
     msg = ServerMessageAdapter.validate_json(json.dumps({"type": "webrtc_close", "session_id": "s1"}))
     assert isinstance(msg, WebrtcClose)
+
+
+def test_say_allowed_during_estop():
+    from uniagent.protocol import ActionCmd
+
+    assert not is_motion(ActionCmd(name="say", params={"text": "x"}))
+    assert is_motion(ActionCmd(name="hello"))
+    c = Controller(MockBackend(), Settings())
+    c.estop = True
+    run(c.handle(ActionCmd(name="say", params={"text": "请注意"})))
+    with pytest.raises(CommandRejected):
+        run(c.handle(ActionCmd(name="hello")))

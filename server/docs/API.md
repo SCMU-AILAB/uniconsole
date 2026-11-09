@@ -477,12 +477,25 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 | GET | /logs?device_id=&level=info\|warn\|error&limit= | `[{at, level, device_id, message}]`，来自机器人上报的事件 |
 | GET / PUT | /maintenance-window | `{start_min, end_min}` 距零点的分钟数，可跨零点（默认 23:00–03:00） |
 
+### 对讲与播报
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | /intercom/targets | `[{id, label, device_ids}]`，`id` 为 `all` / `group:<分组 id>` / `device:<设备 id>` |
+| GET | /intercom/presets | 常用播报语 `string[]`（设置键 `intercom_presets`） |
+| POST | /intercom/broadcast | `{target_id, text}` → `{played, total, failed: [{device_id, message}]}`；`played` 为实际播放成功的设备数 |
+
+- 播报 = 向每台设备下发 `{"kind":"action","name":"say","params":{"text"}}`，机器人端 TTS 播放后回执。
+- `say` 不是运动指令（服务端 `Command::is_motion`、机器人端 `is_motion` 一致）：不需要控制权，急停中也可以播报。
+- 权限：对设备有「申请 / 持有控制权」权限（观察者不能播报，使用者只能播报给被授权的设备）；无权限、离线、机器人失败的设备列在 `failed`。
+  全部无权限时 403；`text` 为 1–200 字，否则 400。写审计。
+- 按住说话（双向实时音频）走 WebRTC 音频轨，见 §4。模拟机器人提供 `say`；Go2Agent 端尚未注册该技能（会进 `failed`）。
+
 ### 尚未实现（501）
 
 | 模块 | 接口 | 说明 |
 |---|---|---|
 | 智能体 | `/agent/*` | 决定做成**独立服务**（复用 Go2Agent 的规划能力），服务端负责鉴权与转发；接口形状按前端交接文档 §12 |
-| 对讲 | `POST /intercom/broadcast` | TTS 播报需要机器人端音频；`GET /intercom/targets`（全部设备 + 各分组）和 `GET /intercom/presets` 已可用 |
 
 ### 交接文档 §16 的七项决定
 

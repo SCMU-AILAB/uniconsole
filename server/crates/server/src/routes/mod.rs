@@ -5,6 +5,7 @@ mod alerts;
 mod auth;
 mod devices;
 mod fleet;
+mod intercom;
 mod leases;
 mod maintenance;
 mod me;
@@ -177,9 +178,9 @@ pub fn router(state: AppState) -> Router {
         )
         // 已规划、尚未实现（501）：智能体、对讲播报、视频信令
         .route("/agent/{*rest}", axum::routing::any(planned::agent))
-        .route("/intercom/targets", get(planned::intercom_targets))
-        .route("/intercom/presets", get(planned::intercom_presets))
-        .route("/intercom/broadcast", post(planned::intercom_broadcast))
+        .route("/intercom/targets", get(intercom::list_targets))
+        .route("/intercom/presets", get(intercom::presets))
+        .route("/intercom/broadcast", post(intercom::broadcast))
         .route("/webrtc/ice-servers", get(planned::ice_servers))
         // 安全策略（Safety.dc.html）
         .route("/safety", get(safety::get))

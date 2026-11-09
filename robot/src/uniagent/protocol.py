@@ -62,9 +62,15 @@ Command = Annotated[
 CommandAdapter: TypeAdapter = TypeAdapter(Command)
 
 
+# 不让机器人运动的技能（播报等）：不需要控制权，急停中也可以执行。与服务端 Command::is_motion 保持一致
+NON_MOTION_ACTIONS = frozenset({"say"})
+
+
 def is_motion(cmd: BaseModel) -> bool:
-    """停止类指令（stop / estop / release_estop / 阻尼）以外都是运动指令。"""
+    """停止类指令（stop / estop / release_estop / 阻尼）和播报以外都是运动指令。"""
     if isinstance(cmd, (StopCmd, EstopCmd, ReleaseEstopCmd)):
+        return False
+    if isinstance(cmd, ActionCmd) and cmd.name in NON_MOTION_ACTIONS:
         return False
     return not (isinstance(cmd, SetModeCmd) and cmd.mode == "damp")
 
