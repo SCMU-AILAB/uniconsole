@@ -193,6 +193,21 @@ pub enum RobotToServer {
     Pong {
         nonce: u64,
     },
+    /// WebRTC 信令：机器人对前端 offer 的应答
+    WebrtcAnswer {
+        session_id: String,
+        sdp: String,
+    },
+    WebrtcIce {
+        session_id: String,
+        candidate: Value,
+    },
+    /// 机器人结束（或拒绝）一路视频，`reason` 给人看
+    WebrtcClose {
+        session_id: String,
+        #[serde(default)]
+        reason: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,6 +231,20 @@ pub enum ServerToRobot {
     },
     Ping {
         nonce: u64,
+    },
+    /// WebRTC 信令（前端 → 机器人转发）。`ice_servers` 与前端拿到的相同（含限时 TURN 凭据）
+    WebrtcOffer {
+        session_id: String,
+        sdp: String,
+        streams: Vec<String>,
+        ice_servers: Value,
+    },
+    WebrtcIce {
+        session_id: String,
+        candidate: Value,
+    },
+    WebrtcClose {
+        session_id: String,
     },
 }
 
@@ -249,6 +278,24 @@ pub enum ClientToServer {
     },
     Ping {
         nonce: u64,
+    },
+    /// WebRTC 信令：`session_id` 由前端生成（UUID），一路视频一个
+    WebrtcOffer {
+        device_id: String,
+        session_id: String,
+        sdp: String,
+        /// front | depth | rear …，缺省 ["front"]
+        #[serde(default)]
+        streams: Vec<String>,
+    },
+    WebrtcIce {
+        device_id: String,
+        session_id: String,
+        candidate: Value,
+    },
+    WebrtcClose {
+        device_id: String,
+        session_id: String,
     },
 }
 
@@ -327,6 +374,28 @@ pub enum ServerEvent {
         code: String,
         message: String,
     },
+    /// WebRTC 信令（机器人 → 前端），只发给发起该 session 的那条连接（`conn_id` 不序列化）
+    WebrtcAnswer {
+        #[serde(skip)]
+        conn_id: Uuid,
+        device_id: String,
+        session_id: String,
+        sdp: String,
+    },
+    WebrtcIce {
+        #[serde(skip)]
+        conn_id: Uuid,
+        device_id: String,
+        session_id: String,
+        candidate: Value,
+    },
+    WebrtcClose {
+        #[serde(skip)]
+        conn_id: Uuid,
+        device_id: String,
+        session_id: String,
+        reason: Option<String>,
+    },
 }
 
 impl ServerEvent {
@@ -338,6 +407,16 @@ impl ServerEvent {
     }
 
     /// 用于按订阅过滤；None 表示所有已认证客户端都应收到
+    /// 只发给某一条前端连接的事件（WebRTC 信令）
+    pub fn target_conn(&self) -> Option<Uuid> {
+        match self {
+            ServerEvent::WebrtcAnswer { conn_id, .. }
+            | ServerEvent::WebrtcIce { conn_id, .. }
+            | ServerEvent::WebrtcClose { conn_id, .. } => Some(*conn_id),
+            _ => None,
+        }
+    }
+
     pub fn device_id(&self) -> Option<&str> {
         match self {
             ServerEvent::Telemetry { device_id, .. }
@@ -350,6 +429,9 @@ impl ServerEvent {
             ServerEvent::Estop { device_id, .. } | ServerEvent::Alert { device_id, .. } => {
                 device_id.as_deref()
             }
+            ServerEvent::WebrtcAnswer { device_id, .. }
+            | ServerEvent::WebrtcIce { device_id, .. }
+            | ServerEvent::WebrtcClose { device_id, .. } => Some(device_id),
             ServerEvent::Pong { .. }
             | ServerEvent::Error { .. }
             | ServerEvent::Changed { .. }
@@ -412,5 +494,29 @@ mod tests {
             }
             .is_motion()
         );
+    }
+
+    #[test]
+    fn webrtc_wire_format() {
+        let raw = r#"{"type":"webrtc_offer","device_id":"go2-01","session_id":"s1","sdp":"v=0"}"#;
+        match serde_json::from_str::<ClientToServer>(raw).unwrap() {
+            ClientToServer::WebrtcOffer { streams, .. } => assert!(streams.is_empty()),
+            other => panic!("unexpected {other:?}"),
+        }
+        let raw = r#"{"type":"webrtc_close","session_id":"s1"}"#;
+        assert!(matches!(
+            serde_json::from_str::<RobotToServer>(raw).unwrap(),
+            RobotToServer::WebrtcClose { reason: None, .. }
+        ));
+        let ev = ServerEvent::WebrtcAnswer {
+            conn_id: Uuid::nil(),
+            device_id: "go2-01".into(),
+            session_id: "s1".into(),
+            sdp: "v=0".into(),
+        };
+        let v = serde_json::to_value(&ev).unwrap();
+        assert_eq!(v["type"], "webrtc_answer");
+        assert!(v.get("conn_id").is_none());
+        assert_eq!(ev.target_conn(), Some(Uuid::nil()));
     }
 }

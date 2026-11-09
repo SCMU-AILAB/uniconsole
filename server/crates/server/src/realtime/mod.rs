@@ -4,6 +4,7 @@ mod client_ws;
 mod hub;
 mod persist;
 mod robot_ws;
+pub mod webrtc;
 
 pub use client_ws::client_ws;
 pub use hub::{Ack, Hub};

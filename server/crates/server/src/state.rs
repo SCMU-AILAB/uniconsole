@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     config::Config,
-    realtime::{Hub, TelemetrySample},
+    realtime::{Hub, TelemetrySample, webrtc::WebrtcSessions},
     services::{
         alerting::AlertEngine, fleet_timeline::TimelinePlayer, leases::LeaseService,
         missions::MissionRunner, safety::SafetyService, sessions::LoginLimiter,
@@ -23,6 +23,7 @@ pub struct AppState {
     pub alerts: Arc<AlertEngine>,
     pub missions: Arc<MissionRunner>,
     pub fleet_player: Arc<TimelinePlayer>,
+    pub webrtc: Arc<WebrtcSessions>,
     pub telemetry_tx: mpsc::Sender<TelemetrySample>,
     pub login_limiter: Arc<LoginLimiter>,
 }

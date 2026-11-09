@@ -208,3 +208,22 @@ def test_mock_navigate_and_say():
         run(b.action("say", {"text": " "}))
     with pytest.raises(AdapterError):
         run(b.action("navigate_to", {}))
+
+
+def test_parse_webrtc_signaling():
+    from uniagent.protocol import WebrtcClose, WebrtcOffer
+
+    msg = ServerMessageAdapter.validate_json(
+        json.dumps(
+            {
+                "type": "webrtc_offer",
+                "session_id": "s1",
+                "sdp": "v=0",
+                "streams": ["front"],
+                "ice_servers": [{"urls": ["stun:stun.l.google.com:19302"]}],
+            }
+        )
+    )
+    assert isinstance(msg, WebrtcOffer) and msg.streams == ["front"]
+    msg = ServerMessageAdapter.validate_json(json.dumps({"type": "webrtc_close", "session_id": "s1"}))
+    assert isinstance(msg, WebrtcClose)

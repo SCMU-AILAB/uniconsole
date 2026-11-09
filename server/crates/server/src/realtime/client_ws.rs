@@ -23,11 +23,13 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use tokio::sync::broadcast::error::RecvError;
+use uuid::Uuid;
 
 use crate::{
     auth::AuthUser,
     error::AppResult,
     protocol::{ClientToServer, Command, ServerEvent},
+    realtime::webrtc::Offer,
     services::{
         access, audit,
         control::{self, Actor},
@@ -48,6 +50,16 @@ pub async fn client_ws(
 enum Subs {
     All,
     Some(HashSet<String>),
+}
+
+/// 一条前端连接的状态
+struct Conn {
+    id: Uuid,
+    subs: Subs,
+    /// 本连接驱动过的设备（断开时补发停止）
+    driving: HashSet<String>,
+    /// 开启了点云的设备
+    clouds: HashSet<String>,
 }
 
 fn json(ev: &ServerEvent) -> Message {
@@ -74,9 +86,12 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
     let (mut sink, mut stream) = socket.split();
     let mut events = st.hub.subscribe();
     let mut clouds_rx = st.hub.subscribe_pointcloud();
-    let mut clouds: HashSet<String> = HashSet::new();
-    let mut subs = Subs::Some(HashSet::new());
-    let mut driving: HashSet<String> = HashSet::new();
+    let mut conn = Conn {
+        id: Uuid::new_v4(),
+        subs: Subs::Some(HashSet::new()),
+        driving: HashSet::new(),
+        clouds: HashSet::new(),
+    };
     let can_see = |id: &str| visible.as_ref().is_none_or(|v| v.contains(id));
 
     tracing::debug!(user = %user.name, "前端已连接");
@@ -94,7 +109,7 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                 };
                 let reply = match serde_json::from_str::<ClientToServer>(text.as_str()) {
                     Err(e) => Some(ServerEvent::Error { code: "bad_request".into(), message: format!("无法解析消息：{e}") }),
-                    Ok(msg) => on_message(&st, &user, msg, &mut subs, &mut driving, &mut clouds, &can_see).await,
+                    Ok(msg) => on_message(&st, &user, msg, &mut conn, &can_see).await,
                 };
                 if let Some(r) = reply
                     && sink.send(json(&r)).await.is_err() { break; }
@@ -110,8 +125,9 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                 };
                 let deliver = match (&*ev, ev.device_id()) {
                     (ServerEvent::Notice { member_id, .. }, _) => *member_id == user.id,
+                    (e, _) if e.target_conn().is_some() => e.target_conn() == Some(conn.id),
                     (_, None) => true,
-                    (_, Some(id)) => can_see(id) && match &subs {
+                    (_, Some(id)) => can_see(id) && match &conn.subs {
                         Subs::All => true,
                         Subs::Some(set) => set.contains(id),
                     },
@@ -120,9 +136,9 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                     break;
                 }
             }
-            frame = clouds_rx.recv(), if !clouds.is_empty() => {
+            frame = clouds_rx.recv(), if !conn.clouds.is_empty() => {
                 match frame {
-                    Ok(f) if clouds.contains(&f.0) => {
+                    Ok(f) if conn.clouds.contains(&f.0) => {
                         if sink.send(cloud_frame(&f.0, &f.1)).await.is_err() { break; }
                     }
                     Ok(_) | Err(RecvError::Lagged(_)) => {}
@@ -132,7 +148,8 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
         }
     }
 
-    for id in driving {
+    st.webrtc.client_gone(&st, conn.id);
+    for id in conn.driving {
         if let Err(e) = control::execute(
             &st,
             Actor::System("前端断线保护"),
@@ -223,11 +240,16 @@ async fn on_message(
     st: &AppState,
     user: &AuthUser,
     msg: ClientToServer,
-    subs: &mut Subs,
-    driving: &mut HashSet<String>,
-    clouds: &mut HashSet<String>,
+    conn: &mut Conn,
     can_see: &impl Fn(&str) -> bool,
 ) -> Option<ServerEvent> {
+    let Conn {
+        id: conn_id,
+        subs,
+        driving,
+        clouds,
+    } = conn;
+    let conn_id = *conn_id;
     match msg {
         ClientToServer::Subscribe { device_ids } => {
             if device_ids.is_empty() {
@@ -314,5 +336,50 @@ async fn on_message(
             None
         }
         ClientToServer::Ping { nonce } => Some(ServerEvent::Pong { nonce }),
+        ClientToServer::WebrtcOffer {
+            device_id,
+            session_id,
+            sdp,
+            streams,
+        } => {
+            if !can_see(&device_id) {
+                return Some(ServerEvent::Error {
+                    code: "forbidden".into(),
+                    message: format!("无权访问设备 {device_id}"),
+                });
+            }
+            st.webrtc
+                .offer(
+                    st,
+                    user,
+                    conn_id,
+                    Offer {
+                        device_id,
+                        session_id,
+                        sdp,
+                        streams,
+                    },
+                )
+                .await
+                .err()
+                .map(|e| error(&e))
+        }
+        ClientToServer::WebrtcIce {
+            device_id,
+            session_id,
+            candidate,
+        } => st
+            .webrtc
+            .ice(st, conn_id, &device_id, &session_id, candidate)
+            .err()
+            .map(|e| error(&e)),
+        ClientToServer::WebrtcClose {
+            device_id,
+            session_id,
+        } => st
+            .webrtc
+            .close(st, conn_id, &device_id, &session_id)
+            .err()
+            .map(|e| error(&e)),
     }
 }

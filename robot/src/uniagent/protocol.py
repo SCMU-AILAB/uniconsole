@@ -147,6 +147,26 @@ class Pong(BaseModel):
     nonce: int
 
 
+class WebrtcAnswerMsg(BaseModel):
+    type: Literal["webrtc_answer"] = "webrtc_answer"
+    session_id: str
+    sdp: str
+
+
+class WebrtcIceUp(BaseModel):
+    type: Literal["webrtc_ice"] = "webrtc_ice"
+    session_id: str
+    candidate: dict
+
+
+class WebrtcCloseUp(BaseModel):
+    """结束或拒绝一路视频；reason 给人看。"""
+
+    type: Literal["webrtc_close"] = "webrtc_close"
+    session_id: str
+    reason: str | None = None
+
+
 # ───────────────────────── 服务器 → 机器人 ─────────────────────────
 
 
@@ -173,5 +193,28 @@ class Ping(BaseModel):
     nonce: int
 
 
-ServerMessage = Annotated[Welcome | CommandMsg | Ping, Field(discriminator="type")]
+class WebrtcOffer(BaseModel):
+    """前端发起的一路视频（服务器只转发信令，媒体直连 / 走 TURN）。"""
+
+    type: Literal["webrtc_offer"]
+    session_id: str
+    sdp: str
+    streams: list[str] = Field(default_factory=lambda: ["front"])
+    ice_servers: list[dict] = Field(default_factory=list)
+
+
+class WebrtcIce(BaseModel):
+    type: Literal["webrtc_ice"]
+    session_id: str
+    candidate: dict
+
+
+class WebrtcClose(BaseModel):
+    type: Literal["webrtc_close"]
+    session_id: str
+
+
+ServerMessage = Annotated[
+    Welcome | CommandMsg | Ping | WebrtcOffer | WebrtcIce | WebrtcClose, Field(discriminator="type")
+]
 ServerMessageAdapter: TypeAdapter = TypeAdapter(ServerMessage)

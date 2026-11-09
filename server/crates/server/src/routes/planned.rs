@@ -1,4 +1,4 @@
-//! 已规划、尚未实现的模块：智能体（独立服务）、对讲播报、视频（WebRTC）。
+//! 已规划、尚未实现的模块：智能体（独立服务）、对讲播报；以及 ICE 服务器列表。
 //! 统一返回 501 `not_implemented`，前端据此显示「尚未接入」。
 
 use axum::{Json, extract::State, http::StatusCode};
@@ -53,7 +53,7 @@ pub async fn intercom_presets(
     ))
 }
 
-/// GET /webrtc/ice-servers：来自环境变量 ICE_SERVERS（JSON 数组），缺省为空（仅局域网直连）
-pub async fn ice_servers(State(st): State<AppState>, _user: AuthUser) -> AppResult<Json<Value>> {
-    Ok(Json(st.cfg.ice_servers.clone()))
+/// GET /webrtc/ice-servers：ICE_SERVERS（JSON 数组）+ 配置了 TURN_SECRET 时的限时 TURN 凭据；缺省为空（仅局域网直连）
+pub async fn ice_servers(State(st): State<AppState>, user: AuthUser) -> AppResult<Json<Value>> {
+    Ok(Json(crate::realtime::webrtc::ice_servers(&st, user.id)))
 }

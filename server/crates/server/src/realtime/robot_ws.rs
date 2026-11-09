@@ -137,6 +137,7 @@ async fn handle(st: AppState, device_id: String, socket: WebSocket) {
 
     writer.abort();
     if st.hub.unregister_robot(&device_id, conn_id) {
+        st.webrtc.robot_gone(&st, &device_id);
         tracing::info!(device = %device_id, "机器人离线");
         set_online(&st, &device_id, false).await;
     }
@@ -296,6 +297,9 @@ async fn on_message(
                 message,
             });
         }
+        msg @ (RobotToServer::WebrtcAnswer { .. }
+        | RobotToServer::WebrtcIce { .. }
+        | RobotToServer::WebrtcClose { .. }) => st.webrtc.from_robot(st, device_id, msg),
         RobotToServer::Pong { nonce } => {
             let rtt = (Utc::now().timestamp_millis() as u64).saturating_sub(nonce);
             st.hub

@@ -48,7 +48,7 @@ crates/
     src/lib.rs           re-export：crate::models / crate::protocol / crate::auth（含 AuthUser 提取器）
     src/app.rs           建连接池、迁移、初始管理员、后台任务、路由与中间件、优雅退出
     src/config.rs  error.rs  state.rs  extract.rs
-    src/realtime/        hub（连接表 / 回执 / 事件总线）、robot_ws、client_ws、遥测批量入库
+    src/realtime/        hub（连接表 / 回执 / 事件总线）、robot_ws、client_ws、webrtc（信令中继）、遥测批量入库
     src/services/        control（指令唯一入口）、leases、safety、alerting、access、audit、events、missions（任务调度与执行）、fleet_timeline（联调时间轴播放）、
                          sessions（登录会话 / 限流）、members、recordings、settings（键值配置）
     src/routes/          REST，全部挂在 /api/v1
@@ -75,5 +75,5 @@ docs/API.md              接口与协议文档 —— 改接口必须同步更�
 
 接口形状都已在 `docs/API.md` 定下，以下能力目前返回 501 或只存数据：
 围栏下发到机器人、告警通知渠道实际发送、APNs / FCM 推送、
-WebRTC 视频信令、机器人端录制（视频 / 点云）与导出、固件 OTA / 回滚 / 重启 / 远程终端 / 诊断包、
+机器人端相机推流（WebRTC 信令已完成）、机器人端录制（视频 / 点云）与导出、固件 OTA / 回滚 / 重启 / 远程终端 / 诊断包、
 智能体（独立服务）、对讲 TTS 播报、电池健康数据。

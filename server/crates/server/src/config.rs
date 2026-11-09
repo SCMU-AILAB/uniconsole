@@ -27,6 +27,10 @@ pub struct Config {
     pub api_token_ttl_days: i64,
     /// WebRTC ICE 服务器（GET /webrtc/ice-servers），JSON 数组
     pub ice_servers: serde_json::Value,
+    /// 限时 TURN 凭据（coturn use-auth-secret）：TURN_URLS 逗号分隔，TURN_SECRET 为共享密钥
+    pub turn_urls: Vec<String>,
+    pub turn_secret: Option<String>,
+    pub turn_ttl_secs: i64,
     /// 任务单个点位的导航超时（机器人到达后才回执）
     pub mission_step_timeout_secs: u64,
     /// 任务排期字符串里的时刻按哪个时区解释（相对 UTC 的分钟数，默认 +480 北京时间）
@@ -84,6 +88,15 @@ impl Config {
                 }
                 _ => serde_json::json!([]),
             },
+            turn_urls: env::var("TURN_URLS")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect(),
+            turn_secret: env::var("TURN_SECRET").ok().filter(|s| !s.is_empty()),
+            turn_ttl_secs: var("TURN_TTL_SECS", 12 * 3600)?,
             mission_step_timeout_secs: var("MISSION_STEP_TIMEOUT_SECS", 600)?,
             schedule_tz_offset_minutes: var("SCHEDULE_TZ_OFFSET_MINUTES", 480)?,
             bootstrap_admin,

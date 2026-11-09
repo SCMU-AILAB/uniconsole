@@ -483,7 +483,6 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 |---|---|---|
 | 智能体 | `/agent/*` | 决定做成**独立服务**（复用 Go2Agent 的规划能力），服务端负责鉴权与转发；接口形状按前端交接文档 §12 |
 | 对讲 | `POST /intercom/broadcast` | TTS 播报需要机器人端音频；`GET /intercom/targets`（全部设备 + 各分组）和 `GET /intercom/presets` 已可用 |
-| 视频 | 见 §4 | `GET /webrtc/ice-servers` 已可用（环境变量 `ICE_SERVERS`，缺省 `[]` 即仅局域网直连） |
 
 ### 交接文档 §16 的七项决定
 
@@ -516,6 +515,9 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 {"type": "stop", "device_id": "go2-01"}
 {"type": "pointcloud", "device_id": "go2-01", "enable": true}   // 开关点云二进制流（默认关）
 {"type": "ping", "nonce": 1}
+{"type": "webrtc_offer", "device_id": "go2-01", "session_id": "<前端生成的 UUID>", "sdp": "…", "streams": ["front", "depth"]}
+{"type": "webrtc_ice", "device_id": "go2-01", "session_id": "…", "candidate": {…}}
+{"type": "webrtc_close", "device_id": "go2-01", "session_id": "…"}
 ```
 
 摇杆按 10–20 Hz 发送 `move`；松开后停止发送即可——机器人端看门狗 300 ms 内自动停止，
@@ -545,6 +547,9 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 {"type": "changed", "resource": "members", "id": "… | null"}   // 通用失效通知：重新 GET 对应资源，见下表
 {"type": "notice", "member_id": "…", "level": "info|warning", "text": "Kanade 收回了你对 Alpha 的控制权：…"}  // 只发给本人
 {"type": "pong", "nonce": 1}
+{"type": "webrtc_answer", "device_id": "…", "session_id": "…", "sdp": "…"}       // 视频信令只发给发起该 session 的那条连接
+{"type": "webrtc_ice", "device_id": "…", "session_id": "…", "candidate": {…}}
+{"type": "webrtc_close", "device_id": "…", "session_id": "…", "reason": "设备离线 | 机器人端尚未接入视频 | null"}
 {"type": "error", "code": "forbidden", "message": "你没有该设备的控制权（只读）"}   // 上行消息失败，code 同 REST
 ```
 
@@ -589,6 +594,9 @@ server → command {cmd_id, command}
 robot → ack {cmd_id, ok, error}   // move 成功不回执
 robot → event {level, code, message}   // level=critical/warning 自动生成告警；code=estop 同步急停
 robot → <binary> [ts i64 LE][N × (f32 x, f32 y) LE]   // 点云二维投影，服务器加上设备 id 转发给订阅的前端
+server → webrtc_offer {session_id, sdp, streams[], ice_servers[]}  ◀▶  robot → webrtc_answer {session_id, sdp}
+server → webrtc_ice {session_id, candidate}                        ◀▶  robot → webrtc_ice {session_id, candidate}
+server → webrtc_close {session_id}                                 ◀▶  robot → webrtc_close {session_id, reason?}
 ```
 
 急停指令 `{"kind":"estop","drill":true}` 是**演练**：机器人走一遍急停链路并回执，但不驱动硬件、不进入急停状态。
@@ -602,9 +610,24 @@ robot → <binary> [ts i64 LE][N × (f32 x, f32 y) LE]   // 点云二维投影�
 
 ---
 
-## 4. 视频（未实现）
+## 4. 视频：WebRTC 信令
 
-ICE 服务器：`GET /api/v1/webrtc/ice-servers`（环境变量 `ICE_SERVERS`，JSON 数组）。
+服务器**只转发信令**，媒体由机器人直接推给前端（局域网直连，或经 TURN 中继）。消息形状见 §2 / §3。
 
-按 HANDOFF 预期走 WebRTC：服务器只做信令（预留在 `/api/v1/ws` 上增加 `webrtc_offer / answer / ice` 消息），
-媒体流由机器人端直接推到 SFU / 浏览器。
+- 一路视频 = 一个前端生成的 `session_id`（1–128 字符，建议 UUID），归属发起它的那条 WS 连接：
+  answer / ice / close 只回给这条连接；其他连接用这个 id 发 ice / close 返回 `forbidden`，再发 offer 返回 `conflict`。
+- 权限：「查看视频与传感器」（观察者 / 使用者只能看被授权的设备）。设备离线 → `robot_offline`；
+  设备 hello 的 `capabilities` 里没有 `webrtc` → `not_implemented`（前端显示「尚未接入」）。
+- 同一连接对同一 `session_id` 再发 offer = 重新协商，直接转发。
+- 前端连接断开：服务器替它向机器人发 `webrtc_close`。机器人掉线：前端收到 `webrtc_close`（`reason: "设备离线"`）。
+- 机器人拒绝（例如还没接入相机推流）时回 `webrtc_close` 带 `reason`，原样转给前端。
+
+**ICE 服务器**：`GET /api/v1/webrtc/ice-servers` → `[{urls, username?, credential?, expires_at?}]`，
+offer 转发给机器人时附带同一份。
+- `ICE_SERVERS`：静态 JSON 数组（如公共 STUN），缺省 `[]` = 仅局域网直连。
+- `TURN_URLS`（逗号分隔）+ `TURN_SECRET`：追加一条**限时** TURN 凭据（coturn `use-auth-secret`）：
+  `username = "<过期 Unix 时间>:<成员 id>"`，`credential = base64(HMAC-SHA1(TURN_SECRET, username))`，
+  有效期 `TURN_TTL_SECS`（默认 12 小时）。前端在 `expires_at` 之前重新获取即可。
+
+机器人端（`robot/`）目前没有相机推流，收到 offer 会回 `webrtc_close`（「机器人端尚未接入视频」），
+也不会在 `capabilities` 里声明 `webrtc`。接入推流（aiortc / GStreamer）后声明 `webrtc` 即可。
