@@ -235,3 +235,37 @@ class _PasswordFieldState extends State<PasswordField> {
     );
   }
 }
+
+/// 登录 / 注册页之间切换的文字链接（强调色，按下变淡）。
+class AuthLink extends StatelessWidget {
+  const AuthLink({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final t = context.type;
+    final mobile = LayoutSize.ofContext(context).isMobile;
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: label,
+      focusRadius: AppRadius.sm,
+      builder: (context, st) => AnimatedOpacity(
+        duration: AppMotion.fade(pressed: st.pressed),
+        opacity: !st.enabled ? 0.45 : (st.pressed ? 0.55 : 1),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.x1),
+          child: Text(
+            label,
+            style: (mobile ? t.mobileFootnote : t.footnote).copyWith(
+              color: c.accent,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -209,7 +209,14 @@ class _MemberDialogState extends ConsumerState<_MemberDialog> {
 
     return AppAlert<_Result?>(
       title: _invite ? '邀请成员' : '编辑 ${m!.name}',
-      message: _invite ? null : '${m!.handle} · ${lastSeenText(m, now)}',
+      // 邮箱注册的成员带上邮箱，方便管理员确认是谁（注册后默认观察者，在这里调整角色）。
+      message: _invite
+          ? null
+          : [
+              m!.handle,
+              ?m.email,
+              lastSeenText(m, now),
+            ].join(' · '),
       maxWidth: mobile ? 340 : 440,
       primaryEnabled: _valid,
       content: Column(

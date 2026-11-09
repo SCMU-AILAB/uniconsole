@@ -12,6 +12,9 @@ import 'mock_store.dart';
 ///
 /// 演示账号：示例成员（访客链接除外）的密码都是 [demoPassword]；
 /// Kanade 开启了二次验证，验证码为 [demoCode]。
+///
+/// 邮箱注册：验证码固定为 [demoCode]，同一邮箱 [resendAfter] 内只能获取一次；
+/// 注册后是观察者并直接登录，也可以用邮箱登录。
 class MockAuthRepository implements AuthRepository {
   MockAuthRepository({required this.world, bool signedIn = true}) {
     // 模拟启动时从钥匙串恢复的会话。
@@ -35,6 +38,7 @@ class MockAuthRepository implements AuthRepository {
   static const maxFailures = 5;
   static const failureWindow = Duration(minutes: 15);
   static const lockout = Duration(seconds: 60);
+  static const resendAfter = Duration(seconds: 60);
 
   /// 网络与服务端处理的模拟耗时（测试里可设为 0）。
   Duration latency = const Duration(milliseconds: 350);
@@ -43,6 +47,9 @@ class MockAuthRepository implements AuthRepository {
   final _passwords = <String, String>{};
   final _twoFactor = <String>{'kanade'};
   final _invites = <String, _Invite>{};
+
+  /// 已发验证码的邮箱 → 发送时间。
+  final _codesSent = <String, DateTime>{};
   final _failures = <String, List<DateTime>>{};
   final _lockedUntil = <String, DateTime>{};
   final _random = Random();
@@ -131,7 +138,7 @@ class MockAuthRepository implements AuthRepository {
     }
 
     final m = world.members.members
-        .where((m) => _normalize(m.handle) == key)
+        .where((m) => _normalize(m.handle) == key || m.email == key)
         .firstOrNull;
     if (m == null ||
         m.guestLink ||
@@ -221,6 +228,79 @@ class MockAuthRepository implements AuthRepository {
     _passwords[id] = password;
     world.members.activate(id);
     _signIn(id, _lastServer);
+    return _session.value!;
+  }
+
+  bool _emailTaken(String email) =>
+      world.members.members.any((m) => m.email == email);
+
+  @override
+  Future<Duration> requestRegisterCode({
+    required String server,
+    required String email,
+  }) async {
+    if (server.trim().isEmpty) {
+      throw const AuthException('bad_request', '请填写服务器地址');
+    }
+    final problem = emailProblem(email);
+    if (problem != null) throw AuthException('bad_request', problem);
+    await Future<void>.delayed(latency);
+    final key = email.trim().toLowerCase();
+    if (_emailTaken(key)) {
+      throw const AuthException('conflict', '该邮箱已注册，请直接登录');
+    }
+    final sent = _codesSent[key];
+    if (sent != null) {
+      final left = resendAfter - DateTime.now().difference(sent);
+      if (left > Duration.zero) {
+        final secs = (left.inMilliseconds / 1000).ceil();
+        throw AuthException(
+          'too_many_requests',
+          '请 $secs 秒后再获取验证码',
+          retryAfter: Duration(seconds: secs),
+        );
+      }
+    }
+    _codesSent[key] = DateTime.now();
+    return resendAfter;
+  }
+
+  @override
+  Future<AuthSession> register({
+    required String server,
+    required RegisterDraft draft,
+  }) async {
+    final problem =
+        emailProblem(draft.email) ??
+        handleProblem(draft.handle) ??
+        passwordProblem(draft.password);
+    if (problem != null) throw AuthException('bad_request', problem);
+    if (draft.name.trim().isEmpty) {
+      throw const AuthException('bad_request', '请填写 1–32 个字的名字');
+    }
+    await Future<void>.delayed(latency);
+    final email = draft.email.trim().toLowerCase();
+    final handle = _normalize(draft.handle);
+    if (_emailTaken(email)) {
+      throw const AuthException('conflict', '该邮箱已注册，请直接登录');
+    }
+    if (world.members.members.any((m) => _normalize(m.handle) == handle)) {
+      throw AuthException('conflict', '账号 @$handle 已被使用');
+    }
+    if (!_codesSent.containsKey(email)) {
+      throw const AuthException('bad_request', '验证码无效或已过期，请重新获取');
+    }
+    if (draft.code.trim() != demoCode) {
+      throw const AuthException('bad_request', '验证码错误');
+    }
+    _codesSent.remove(email);
+    final id = world.members.addRegistered(
+      name: draft.name,
+      handle: handle,
+      email: email,
+    );
+    _passwords[id] = draft.password;
+    _signIn(id, server.trim());
     return _session.value!;
   }
 }

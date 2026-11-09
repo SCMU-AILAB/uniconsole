@@ -100,6 +100,26 @@ class MockMemberRepository implements MemberRepository {
     return id;
   }
 
+  /// 邮箱注册：直接建一个可登录的观察者，返回 id（不做权限检查，由调用方负责查重）。
+  String addRegistered({
+    required String name,
+    required String handle,
+    required String email,
+  }) {
+    final id = 'm${DateTime.now().microsecondsSinceEpoch}';
+    _members.value = [
+      ..._members.value,
+      Member(
+        id: id,
+        name: name.trim(),
+        handle: handle.startsWith('@') ? handle : '@$handle',
+        role: MemberRole.viewer,
+        email: email,
+      ),
+    ];
+    return id;
+  }
+
   /// 通过邀请链接设置了密码。
   void activate(String id) => _set(id, (m) => m.copyWith(pendingInvite: false));
 

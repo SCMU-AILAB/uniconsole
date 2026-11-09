@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/destinations.dart';
 import '../../core/theme/theme.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/models/models.dart';
@@ -188,7 +190,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             AuthField(
               label: '账号',
               child: AppTextField(
-                hint: '@账号',
+                hint: '@账号或邮箱',
                 semanticLabel: '账号',
                 controller: _handle,
                 focusNode: _handleFocus,
@@ -217,13 +219,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return AuthScaffold(
       title: '登录 UniConsole',
       subtitle: '机器人管理与联控平台',
-      footer: Text(
-        '收到邀请链接时，直接打开链接设置密码。\n忘记密码请联系平台管理员。',
-        textAlign: TextAlign.center,
-        style: (mobile ? t.mobileFootnote : t.footnote).copyWith(
-          color: c.secondaryLabel,
-          height: 1.5,
-        ),
+      footer: Column(
+        children: [
+          Text(
+            '收到邀请链接时，直接打开链接设置密码。\n忘记密码请联系平台管理员。',
+            textAlign: TextAlign.center,
+            style: (mobile ? t.mobileFootnote : t.footnote).copyWith(
+              color: c.secondaryLabel,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          AuthLink(
+            label: '没有账号？用邮箱注册',
+            onTap: _busy ? null : () => context.go(Routes.register),
+          ),
+        ],
       ),
       child: AutofillGroup(
         child: Column(

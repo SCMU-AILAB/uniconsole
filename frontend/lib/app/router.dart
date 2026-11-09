@@ -11,6 +11,7 @@ import '../features/alerts/alert_detail_page.dart';
 import '../features/alerts/alerts_page.dart';
 import '../features/auth/invite_page.dart';
 import '../features/auth/login_page.dart';
+import '../features/auth/register_page.dart';
 import '../features/control/control_page.dart';
 import '../features/devices/device_detail_page.dart';
 import '../features/devices/devices_page.dart';
@@ -56,7 +57,10 @@ GoRouter buildRouter({
     final path = state.uri.path;
     if (path == '/') return Routes.devices;
     if (auth == null) return null;
-    final open = path == Routes.login || path.startsWith('/invite/');
+    final open =
+        path == Routes.login ||
+        path == Routes.register ||
+        path.startsWith('/invite/');
     final signedIn = auth.session != null;
     if (!signedIn && !open) {
       return Uri(
@@ -64,6 +68,7 @@ GoRouter buildRouter({
         queryParameters: {'from': state.uri.toString()},
       ).toString();
     }
+    if (signedIn && path == Routes.register) return Routes.devices;
     if (signedIn && path == Routes.login) {
       final from = state.uri.queryParameters['from'];
       return from != null && from.startsWith('/') && !from.startsWith('/login')
@@ -82,6 +87,11 @@ GoRouter buildRouter({
         path: Routes.login,
         pageBuilder: (context, state) =>
             NoTransitionPage(key: state.pageKey, child: const LoginPage()),
+      ),
+      GoRoute(
+        path: Routes.register,
+        pageBuilder: (context, state) =>
+            NoTransitionPage(key: state.pageKey, child: const RegisterPage()),
       ),
       GoRoute(
         path: '/invite/:token',

@@ -301,6 +301,20 @@ abstract interface class AuthRepository {
     String password, {
     String? server,
   });
+
+  /// `POST /auth/register/code {email}`：向邮箱发 6 位验证码（10 分钟有效）。
+  /// 返回多久之后可以重新获取。邮箱已注册抛 `conflict`，太频繁抛 `too_many_requests`。
+  Future<Duration> requestRegisterCode({
+    required String server,
+    required String email,
+  });
+
+  /// `POST /auth/register`：校验验证码，创建观察者账号并直接登录。
+  /// 角色由管理员之后在「成员与权限」里调整。
+  Future<AuthSession> register({
+    required String server,
+    required RegisterDraft draft,
+  });
 }
 
 /// 成员与权限（API §1 认证与成员）。违反规则时抛 [MemberException]。

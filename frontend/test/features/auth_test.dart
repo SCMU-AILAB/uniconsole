@@ -5,6 +5,7 @@ import 'package:uniconsole/core/widgets/widgets.dart';
 import 'package:uniconsole/data/mock/mock_repositories.dart';
 import 'package:uniconsole/data/providers.dart';
 import 'package:uniconsole/features/auth/login_page.dart';
+import 'package:uniconsole/features/auth/register_page.dart';
 import 'package:uniconsole/features/devices/devices_page.dart';
 
 import 'helpers.dart';
@@ -45,6 +46,49 @@ void main() {
       await settle(tester);
       expect(find.byType(LoginPage), findsNothing);
       expect(location(tester), '/alerts');
+      await close(tester);
+    });
+  }
+
+  for (final width in [1440.0, 390.0]) {
+    testWidgets('从登录页进入邮箱注册，注册后是观察者并进入设备总览（$width）', (tester) async {
+      final container = await open(
+        tester,
+        location: '/devices',
+        width: width,
+        height: 1000,
+        signedIn: false,
+      );
+      await tapText(tester, '没有账号？用邮箱注册');
+      await settle(tester);
+      expect(find.byType(RegisterPage), findsOneWidget);
+
+      await type(tester, '邮箱', 'not-an-email');
+      await tapText(tester, '发送验证码');
+      expect(find.text('邮箱格式不正确'), findsOneWidget);
+
+      await type(tester, '邮箱', 'newbie@example.com');
+      await tapText(tester, '发送验证码');
+      await settle(tester);
+      expect(find.textContaining('验证码已发送到 newbie@example.com'), findsOneWidget);
+      expect(find.textContaining('秒后重发'), findsOneWidget);
+
+      await type(tester, '邮箱验证码', '000000');
+      await type(tester, '名字', '新同学');
+      await type(tester, '账号', 'newbie');
+      await type(tester, '密码', 'newbie-pass');
+      await type(tester, '再次输入密码', 'newbie-pass');
+      await tapText(tester, '注册并登录');
+      await settle(tester);
+      expect(find.text('验证码错误'), findsOneWidget);
+
+      await type(tester, '邮箱验证码', MockAuthRepository.demoCode);
+      await tapText(tester, '注册并登录');
+      await settle(tester);
+      expect(find.byType(DevicesPage), findsOneWidget);
+      final me = container.read(mockWorldProvider).me;
+      expect(me.role.name, 'viewer');
+      expect(me.email, 'newbie@example.com');
       await close(tester);
     });
   }
@@ -109,8 +153,8 @@ void main() {
   });
 
   for (final width in [320.0, 390.0, 768.0, 1000.0, 1440.0]) {
-    testWidgets('登录页与邀请页在 $width 宽度下不溢出', (tester) async {
-      for (final loc in ['/login', '/invite/demo']) {
+    testWidgets('登录页、注册页与邀请页在 $width 宽度下不溢出', (tester) async {
+      for (final loc in ['/login', '/register', '/invite/demo']) {
         await open(
           tester,
           location: loc,
@@ -119,6 +163,14 @@ void main() {
           signedIn: false,
         );
         expect(tester.takeException(), isNull);
+        if (loc == '/register') {
+          // 第二步：验证码输入框旁边有「重新发送」按钮。
+          await type(tester, '邮箱', 'w$width@example.com');
+          await tapText(tester, '发送验证码');
+          await settle(tester);
+          expect(find.textContaining('秒后重发'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
         await close(tester);
       }
     });

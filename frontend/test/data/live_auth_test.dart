@@ -323,4 +323,82 @@ void main() {
       expect(calls, 1);
     });
   });
+
+  group('邮箱注册', () {
+    test('发验证码、注册并登录；邮箱可以登录', () async {
+      final sent = <http.Request>[];
+      final client = MockClient((req) async {
+        sent.add(req);
+        if (req.url.path.endsWith('/register/code')) {
+          return json({'expires_in': 600, 'resend_after': 60});
+        }
+        return json(
+          loginOk({...member, 'role': 'viewer', 'email': 'lin@example.com'}),
+          201,
+        );
+      });
+      final store = MemoryTokenStore();
+      final auth = await LiveAuthRepository.restore(store, client: client);
+      final wait = await auth.requestRegisterCode(
+        server: 'h.local',
+        email: ' Lin@Example.com ',
+      );
+      expect(wait, const Duration(seconds: 60));
+      expect('${sent[0].url}', 'http://h.local/api/v1/auth/register/code');
+      expect(jsonDecode(sent[0].body), {'email': 'Lin@Example.com'});
+
+      final s = await auth.register(
+        server: 'h.local',
+        draft: const RegisterDraft(
+          email: 'lin@example.com',
+          code: ' 123456 ',
+          handle: '@linyue',
+          name: ' 林悦 ',
+          password: 'pw-12345678',
+        ),
+      );
+      expect('${sent[1].url}', 'http://h.local/api/v1/auth/register');
+      final body = jsonDecode(sent[1].body) as Map;
+      expect(body['code'], '123456');
+      expect(body['name'], '林悦');
+      expect(body['handle'], '@linyue');
+      expect(body['device_name'], isNotEmpty);
+      expect(s.member!.role, MemberRole.viewer);
+      expect(s.member!.email, 'lin@example.com');
+      expect(auth.session, same(s));
+      expect(store.session!['token'], 'jwt-1');
+    });
+
+    test('本地先查格式；服务端错误原样返回，429 带倒计时', () async {
+      final replies = <http.Response>[
+        error(409, 'conflict', '该邮箱已注册，请直接登录'),
+        error(429, 'too_many_requests', '请 37 秒后再获取验证码'),
+        error(502, 'upstream_unavailable', '邮件发送失败，请稍后再试'),
+      ];
+      var calls = 0;
+      final client = MockClient((_) async {
+        calls++;
+        return replies.removeAt(0);
+      });
+      final auth = await LiveAuthRepository.restore(
+        MemoryTokenStore(),
+        client: client,
+      );
+      Future<AuthException> attempt(String email) async {
+        try {
+          await auth.requestRegisterCode(server: 'h.local', email: email);
+        } on AuthException catch (e) {
+          return e;
+        }
+        throw StateError('应当失败');
+      }
+
+      expect((await attempt('nope')).message, '邮箱格式不正确');
+      expect(calls, 0);
+      expect((await attempt('a@b.com')).code, 'conflict');
+      final limited = await attempt('a@b.com');
+      expect(limited.retryAfter, const Duration(seconds: 37));
+      expect((await attempt('a@b.com')).code, 'upstream_unavailable');
+    });
+  });
 }

@@ -232,6 +232,62 @@ class LiveAuthRepository implements AuthRepository {
     }
   }
 
+  @override
+  Future<Duration> requestRegisterCode({
+    required String server,
+    required String email,
+  }) async {
+    final host = server.trim();
+    if (host.isEmpty) {
+      throw const AuthException('bad_request', '请填写服务器地址');
+    }
+    final problem = emailProblem(email);
+    if (problem != null) throw AuthException('bad_request', problem);
+    final api = _anonymous(_base(host));
+    try {
+      final json = await api.post('/auth/register/code', {
+        'email': email.trim(),
+      });
+      final secs = json is Map<String, Object?>
+          ? (json['resend_after'] as num?)?.toInt()
+          : null;
+      return Duration(seconds: secs ?? 60);
+    } on ApiException catch (e) {
+      throw _auth(e);
+    } finally {
+      api.close();
+    }
+  }
+
+  @override
+  Future<AuthSession> register({
+    required String server,
+    required RegisterDraft draft,
+  }) async {
+    final host = server.trim();
+    final problem =
+        emailProblem(draft.email) ??
+        handleProblem(draft.handle) ??
+        passwordProblem(draft.password);
+    if (problem != null) throw AuthException('bad_request', problem);
+    final api = _anonymous(_base(host));
+    try {
+      final json = await api.post('/auth/register', {
+        'email': draft.email.trim(),
+        'code': draft.code.trim(),
+        'handle': draft.handle.trim(),
+        'name': draft.name.trim(),
+        'password': draft.password,
+        'device_name': deviceName(),
+      });
+      return await _accept(host, json);
+    } on ApiException catch (e) {
+      throw _auth(e);
+    } finally {
+      api.close();
+    }
+  }
+
   static Map<String, Object?> _sessionToStore(AuthSession s) => {
     'server': s.server,
     'token': s.token,

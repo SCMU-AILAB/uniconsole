@@ -41,6 +41,7 @@ Member memberFromJson(Map<String, Object?> j) => Member(
   lastSeen: _time(j['last_seen']),
   disabled: j['disabled'] == true,
   pendingInvite: j['pending_invite'] == true,
+  email: j['email'] is String ? j['email']! as String : null,
 );
 
 /// 前端模型 → 本地保存用的 JSON（与 API 同形，读回时走 [memberFromJson]）。
@@ -60,6 +61,7 @@ Map<String, Object?> memberToJson(Member m) => {
   'last_seen': m.lastSeen?.toUtc().toIso8601String(),
   'disabled': m.disabled,
   'pending_invite': m.pendingInvite,
+  if (m.email != null) 'email': m.email,
 };
 
 InviteInfo inviteFromJson(String token, Map<String, Object?> j) => InviteInfo(

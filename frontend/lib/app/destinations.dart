@@ -24,6 +24,7 @@ abstract final class Routes {
   static const me = '/me';
   static const gallery = '/gallery';
   static const login = '/login';
+  static const register = '/register';
   static String invite(String token) => '/invite/$token';
 }
 

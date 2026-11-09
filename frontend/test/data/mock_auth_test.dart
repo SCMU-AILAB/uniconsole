@@ -160,4 +160,70 @@ void main() {
     expect(world.members.members.length, before + 1);
     expect(world.me.name, '王宁');
   });
+
+  group('邮箱注册', () {
+    RegisterDraft draft({
+      String email = 'new@example.com',
+      String code = MockAuthRepository.demoCode,
+      String handle = '@newbie',
+    }) => RegisterDraft(
+      email: email,
+      code: code,
+      handle: handle,
+      name: '新同学',
+      password: 'newbie-pass',
+    );
+
+    test('注册后是观察者并直接登录，之后可以用邮箱登录', () async {
+      await auth.requestRegisterCode(server: server, email: 'New@Example.com');
+      final s = await auth.register(server: server, draft: draft());
+      expect(world.me.name, '新同学');
+      expect(world.me.role, MemberRole.viewer);
+      expect(world.me.email, 'new@example.com');
+      expect(auth.session, same(s));
+
+      await auth.logout();
+      final again = await auth.login(
+        server: server,
+        handle: 'new@example.com',
+        password: 'newbie-pass',
+      );
+      expect(again.memberId, s.memberId);
+    });
+
+    test('验证码错误、未获取、60 秒内重复获取、邮箱或账号重复', () async {
+      await expectLater(
+        auth.register(server: server, draft: draft()),
+        fails('bad_request'),
+      );
+      await auth.requestRegisterCode(server: server, email: 'new@example.com');
+      await expectLater(
+        auth.requestRegisterCode(server: server, email: 'new@example.com'),
+        throwsA(
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'too_many_requests')
+              .having((e) => e.retryAfter, 'retryAfter', isNotNull),
+        ),
+      );
+      await expectLater(
+        auth.register(
+          server: server,
+          draft: draft(code: '000000'),
+        ),
+        fails('bad_request'),
+      );
+      await expectLater(
+        auth.register(
+          server: server,
+          draft: draft(handle: 'linyue'),
+        ),
+        fails('conflict'),
+      );
+      await auth.register(server: server, draft: draft());
+      await expectLater(
+        auth.requestRegisterCode(server: server, email: 'new@example.com'),
+        fails('conflict'),
+      );
+    });
+  });
 }

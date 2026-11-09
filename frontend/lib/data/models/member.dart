@@ -31,6 +31,7 @@ class Member {
     this.lastSeen,
     this.disabled = false,
     this.pendingInvite = false,
+    this.email,
   });
 
   final String id;
@@ -61,6 +62,9 @@ class Member {
   /// 已邀请、尚未通过邀请链接设置密码（API `pending_invite`）。
   final bool pendingInvite;
 
+  /// 邮箱注册的账号才有（API `email`）；只有管理员和本人看得到，其他人为 null。
+  final String? email;
+
   bool expired(DateTime now) => expiresAt != null && !expiresAt!.isAfter(now);
 
   Member copyWith({
@@ -88,6 +92,7 @@ class Member {
     lastSeen: lastSeen ?? this.lastSeen,
     disabled: disabled ?? this.disabled,
     pendingInvite: pendingInvite ?? this.pendingInvite,
+    email: email,
   );
 }
 
