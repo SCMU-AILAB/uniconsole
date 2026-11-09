@@ -40,6 +40,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/password", post(auth::change_password))
         .route("/auth/invites/{token}", get(auth::invite_info))
         .route("/auth/invites/{token}/accept", post(auth::accept_invite))
+        .route("/auth/register/code", post(auth::register_code))
+        .route("/auth/register", post(auth::register))
         // 当前账户（设置页）
         .route("/me/sessions", get(me::list_sessions))
         .route("/me/sessions/{id}", delete(me::revoke_session))
@@ -62,6 +64,7 @@ pub fn router(state: AppState) -> Router {
                 .delete(members::remove),
         )
         .route("/members/{id}/invite", post(members::reinvite))
+        .route("/members/{id}/approve", post(members::approve))
         .route(
             "/members/{id}/devices",
             get(members::grants).put(members::put_grants),

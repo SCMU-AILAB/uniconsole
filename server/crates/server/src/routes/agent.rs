@@ -30,6 +30,7 @@ use crate::{
     error::{AppError, AppResult},
     protocol::ServerEvent,
     state::AppState,
+    util::constant_time_eq,
 };
 
 /// 智能体服务的单次请求超时（规划可能较慢；流式回复走 WS，不受此限制）
@@ -158,10 +159,6 @@ pub async fn push_event(
         payload: req.event,
     });
     Ok(StatusCode::NO_CONTENT)
-}
-
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 #[cfg(test)]

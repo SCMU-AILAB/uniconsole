@@ -24,6 +24,11 @@ pub fn normalize_handle(raw: &str) -> Option<String> {
     ok.then_some(h)
 }
 
+/// 等长比较不提前退出，避免按耗时猜出密钥 / 验证码
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -39,6 +39,12 @@ pub struct Config {
     pub mission_step_timeout_secs: u64,
     /// 任务排期字符串里的时刻按哪个时区解释（相对 UTC 的分钟数，默认 +480 北京时间）
     pub schedule_tz_offset_minutes: i32,
+    /// 发信服务器（注册验证码），如 `smtp://127.0.0.1:25`；为空时邮件只写日志
+    pub smtp_url: Option<String>,
+    /// 发件人，如 `UniConsole <noreply@silencecf.me>`
+    pub mail_from: String,
+    /// 是否开放邮箱自助注册（注册后仍需管理员审核）
+    pub registration_enabled: bool,
     /// 首次启动时若没有任何成员则创建管理员
     pub bootstrap_admin: Option<(String, String)>,
 }
@@ -108,6 +114,12 @@ impl Config {
             agent_token: env::var("AGENT_TOKEN").ok().filter(|s| !s.is_empty()),
             mission_step_timeout_secs: var("MISSION_STEP_TIMEOUT_SECS", 600)?,
             schedule_tz_offset_minutes: var("SCHEDULE_TZ_OFFSET_MINUTES", 480)?,
+            smtp_url: env::var("SMTP_URL").ok().filter(|s| !s.trim().is_empty()),
+            mail_from: env::var("MAIL_FROM")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "UniConsole <noreply@silencecf.me>".into()),
+            registration_enabled: var("REGISTRATION_ENABLED", true)?,
             bootstrap_admin,
         })
     }

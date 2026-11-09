@@ -86,6 +86,9 @@ fn default_session_name(client: &str) -> String {
 
 /// 账号状态检查（密码已验证之后）
 pub fn ensure_active(row: &MemberRow) -> AppResult<()> {
+    if row.pending_approval {
+        return Err(AppError::PendingApproval);
+    }
     if row.disabled {
         return Err(AppError::forbidden("账号已停用"));
     }

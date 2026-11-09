@@ -23,6 +23,9 @@ pub enum AppError {
     TwoFactorInvalid,
     #[error("{0}")]
     Forbidden(String),
+    /// 403：邮箱注册的账号还没通过管理员审核
+    #[error("账号正在等待管理员审核，通过后会邮件通知你")]
+    PendingApproval,
     #[error("{0}")]
     NotFound(String),
     #[error("{0}")]
@@ -64,6 +67,7 @@ impl AppError {
             AppError::TwoFactorRequired => (StatusCode::UNAUTHORIZED, "two_factor_required"),
             AppError::TwoFactorInvalid => (StatusCode::UNAUTHORIZED, "two_factor_invalid"),
             AppError::Forbidden(_) => (StatusCode::FORBIDDEN, "forbidden"),
+            AppError::PendingApproval => (StatusCode::FORBIDDEN, "pending_approval"),
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             AppError::Conflict(_) | AppError::ConflictDevices { .. } => {
                 (StatusCode::CONFLICT, "conflict")

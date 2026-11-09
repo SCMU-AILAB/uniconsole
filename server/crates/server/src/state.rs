@@ -7,9 +7,9 @@ use crate::{
     config::Config,
     realtime::{Hub, TelemetrySample, webrtc::WebrtcSessions},
     services::{
-        alerting::AlertEngine, fleet_timeline::TimelinePlayer, geofence::Geofence,
-        leases::LeaseService, missions::MissionRunner, safety::SafetyService,
-        sessions::LoginLimiter,
+        alerting::AlertEngine, email_codes::CodeLimiter, fleet_timeline::TimelinePlayer,
+        geofence::Geofence, leases::LeaseService, mailer::Mailer, missions::MissionRunner,
+        safety::SafetyService, sessions::LoginLimiter,
     },
 };
 
@@ -30,4 +30,6 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub telemetry_tx: mpsc::Sender<TelemetrySample>,
     pub login_limiter: Arc<LoginLimiter>,
+    pub mailer: Arc<Mailer>,
+    pub code_limiter: Arc<CodeLimiter>,
 }

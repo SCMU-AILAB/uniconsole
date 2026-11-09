@@ -73,6 +73,8 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
         geofence: Arc::new(crate::services::geofence::Geofence::load(&db).await?),
         telemetry_tx: spawn_telemetry_writer(db.clone()),
         login_limiter: Arc::new(LoginLimiter::default()),
+        mailer: Arc::new(crate::services::mailer::Mailer::from_config(&cfg)?),
+        code_limiter: Arc::default(),
         hub,
         cfg,
         db,
@@ -257,6 +259,9 @@ async fn retention_cleaner(st: AppState) {
                 tracing::warn!(error = %e, table, "清理过期数据失败");
             }
         }
+        let _ = sqlx::query("DELETE FROM email_codes WHERE expires_at < now()")
+            .execute(&st.db)
+            .await;
     }
 }
 

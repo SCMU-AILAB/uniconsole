@@ -28,6 +28,9 @@ ssh yaoyifeng@192.168.0.239 journalctl -u uniconsole-server -f   # 看日志
 
 服务器上的 `.env`（数据库密码、JWT 密钥、初始管理员密码）只在服务器上，不进仓库、不会被 deploy 覆盖。
 
+发信：服务器上的 Postfix 只监听本机 25 端口，经 Resend 中继（587）发出（宽带封了出站 25），
+服务端 `SMTP_URL=smtp://127.0.0.1:25`。配置和 DNS 记录见 `deploy/mail.md`。
+
 公网：frp 把 `1.13.195.109:8800` 映射到服务器的 8800（`frpc-uniconsole.service`，配置见
 `deploy/frpc-uniconsole.toml.example`）。**用 IP 访问**：`silencecf.me` 未备案，腾讯云会把域名的 HTTP 请求
 302 到拦截页。目前是明文 HTTP，上线前需要 HTTPS（备案域名 + 证书，或改用境外中转）。
@@ -50,7 +53,8 @@ crates/
     src/config.rs  error.rs  state.rs  extract.rs
     src/realtime/        hub（连接表 / 回执 / 事件总线）、robot_ws、client_ws、webrtc（信令中继）、遥测批量入库
     src/services/        control（指令唯一入口）、leases、safety、alerting、access、audit、events、missions（任务调度与执行）、notify（告警通知与升级）、geofence（电子围栏）、fleet_timeline（联调时间轴播放）、
-                         sessions（登录会话 / 限流）、members、recordings、settings（键值配置）
+                         sessions（登录会话 / 限流）、members、recordings、settings（键值配置）、
+                         mailer（发信）、email_codes（邮箱验证码）
     src/routes/          REST，全部挂在 /api/v1
 migrations/              sqlx 迁移（只增不改：新改动写新文件），由 app::MIGRATOR 嵌入
 docs/API.md              接口与协议文档 —— 改接口必须同步更新
