@@ -381,6 +381,11 @@ pub enum ServerEvent {
         code: String,
         message: String,
     },
+    /// 外部服务（智能体）推给某个成员的消息，原样转发（`payload` 自带 `type`，如 agent_message）
+    Forward {
+        member_id: Uuid,
+        payload: Value,
+    },
     /// WebRTC 信令（机器人 → 前端），只发给发起该 session 的那条连接（`conn_id` 不序列化）
     WebrtcAnswer {
         #[serde(skip)]
@@ -440,6 +445,7 @@ impl ServerEvent {
             | ServerEvent::WebrtcIce { device_id, .. }
             | ServerEvent::WebrtcClose { device_id, .. } => Some(device_id),
             ServerEvent::Pong { .. }
+            | ServerEvent::Forward { .. }
             | ServerEvent::Error { .. }
             | ServerEvent::Changed { .. }
             | ServerEvent::Notice { .. } => None,

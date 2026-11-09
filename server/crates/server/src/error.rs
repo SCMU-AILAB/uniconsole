@@ -43,6 +43,9 @@ pub enum AppError {
     EstopActive,
     #[error("{0}")]
     NotImplemented(String),
+    /// 502：依赖的外部服务（智能体）不可用
+    #[error("{0}")]
+    Upstream(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -70,6 +73,7 @@ impl AppError {
             AppError::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout"),
             AppError::EstopActive => (StatusCode::LOCKED, "estop_active"),
             AppError::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
+            AppError::Upstream(_) => (StatusCode::BAD_GATEWAY, "upstream_unavailable"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         }
     }

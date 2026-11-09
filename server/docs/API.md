@@ -24,6 +24,7 @@
 | 423 | estop_active | 急停中拒绝运动指令 |
 | 429 | too_many_requests | 登录失败过多（同一账号 + IP 15 分钟内 5 次，锁定 60 秒） |
 | 501 | not_implemented | 已规划、尚未实现的接口 |
+| 502 | upstream_unavailable | 依赖的外部服务（智能体）不可用 |
 | 503 | robot_offline | 设备不在线 |
 | 504 | timeout | 等待机器人回执超时 |
 
@@ -499,11 +500,27 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
   全部无权限时 403；`text` 为 1–200 字，否则 400。写审计。
 - 按住说话（双向实时音频）走 WebRTC 音频轨，见 §4。模拟机器人提供 `say`；Go2Agent 端尚未注册该技能（会进 `failed`）。
 
+### 智能体（独立服务，服务端鉴权与转发）
+
+接口形状按前端交接文档 §12（`/agent/conversations`、`/agent/plans/{id}/run`、`/agent/skills` …），由智能体服务实现。
+
+- `ANY /api/v1/agent/{路径}` 原样转发到 `AGENT_URL/{路径}`（方法、查询串、请求体、`Content-Type`），响应原样返回。
+  没配置 `AGENT_URL` → 501；智能体服务连不上 → 502 `upstream_unavailable`；超过 60 秒 → 504。
+- 转发时附加：`X-UniConsole-Member-Id`、`X-UniConsole-Member-Name`（百分号编码）、`X-UniConsole-Role`、
+  `X-UniConsole-Token: <AGENT_TOKEN>`，以及成员自己的 `Authorization`。智能体执行计划时用这个令牌回调
+  `POST /devices/{id}/commands` 等接口，控制权、急停、权限检查和成员亲自操作完全一样。
+  HANDOFF §8.3 的规则（运动计划先确认再执行、`motion` 技能不能设为自动）由智能体服务保证。
+- 流式回复：智能体 `POST /api/v1/internal/agent/events`（`Authorization: Bearer <AGENT_TOKEN>`）
+  `{member_id, event: {type: agent_message | agent_delta | agent_plan, conversation_id, …}}` → 204，
+  服务端经 `/api/v1/ws` 把 `event` 原样发给该成员的所有连接。
+
 ### 尚未实现（501）
 
-| 模块 | 接口 | 说明 |
-|---|---|---|
-| 智能体 | `/agent/*` | 决定做成**独立服务**（复用 Go2Agent 的规划能力），服务端负责鉴权与转发；接口形状按前端交接文档 §12 |
+| 接口 | 说明 |
+|---|---|
+| `POST /maps/{id}/remap` | 需要机器人端 SLAM 建图 |
+| `POST /recordings/{id}/export` | 导出 MCAP / rosbag |
+| `POST /firmware/upgrade` · `/firmware/schedule`、`/devices/{id}/rollback` · `/reboot` · `/terminal`、`POST /diagnostics` | 需要机器人端 OTA / 运维能力 |
 
 ### 交接文档 §16 的七项决定
 
@@ -514,7 +531,7 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 | 3 | 邀请成员的密码 | 方案一：`POST /members` 不传密码，返回一次性邀请链接 `invite_url`（7 天有效），对方打开后自己设密码 |
 | 4 | 通用 `changed` 推送 | 加，见 §2 的 `changed.resource` 表 |
 | 5 | 点云传输 | 过渡期走 WS 二进制帧（已实现，按设备开关），以后迁到 WebRTC 数据通道 |
-| 6 | 智能体放哪 | 独立服务；服务端只做鉴权与转发，`/agent/*` 现在返回 501 |
+| 6 | 智能体放哪 | 独立服务；服务端只做鉴权与转发（见「智能体」），未配置 `AGENT_URL` 时 501 |
 | 7 | 急停演练 | 机器人协议的急停指令加 `drill` 标志（已实现），`POST /safety/drill` |
 
 ### 系统

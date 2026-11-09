@@ -31,6 +31,10 @@ pub struct Config {
     pub turn_urls: Vec<String>,
     pub turn_secret: Option<String>,
     pub turn_ttl_secs: i64,
+    /// 智能体服务（独立部署）的地址；为空时 /agent/* 返回 501
+    pub agent_url: Option<String>,
+    /// 服务端与智能体服务之间的共享密钥（双向：转发时带上，回推事件时校验）
+    pub agent_token: Option<String>,
     /// 任务单个点位的导航超时（机器人到达后才回执）
     pub mission_step_timeout_secs: u64,
     /// 任务排期字符串里的时刻按哪个时区解释（相对 UTC 的分钟数，默认 +480 北京时间）
@@ -97,6 +101,11 @@ impl Config {
                 .collect(),
             turn_secret: env::var("TURN_SECRET").ok().filter(|s| !s.is_empty()),
             turn_ttl_secs: var("TURN_TTL_SECS", 12 * 3600)?,
+            agent_url: env::var("AGENT_URL")
+                .ok()
+                .map(|u| u.trim().trim_end_matches('/').to_owned())
+                .filter(|u| !u.is_empty()),
+            agent_token: env::var("AGENT_TOKEN").ok().filter(|s| !s.is_empty()),
             mission_step_timeout_secs: var("MISSION_STEP_TIMEOUT_SECS", 600)?,
             schedule_tz_offset_minutes: var("SCHEDULE_TZ_OFFSET_MINUTES", 480)?,
             bootstrap_admin,

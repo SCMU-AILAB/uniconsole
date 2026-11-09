@@ -63,7 +63,11 @@ struct Conn {
 }
 
 fn json(ev: &ServerEvent) -> Message {
-    Message::Text(serde_json::to_string(ev).expect("serialize").into())
+    let text = match ev {
+        ServerEvent::Forward { payload, .. } => payload.to_string(),
+        ev => serde_json::to_string(ev).expect("serialize"),
+    };
+    Message::Text(text.into())
 }
 
 fn error(e: &crate::error::AppError) -> ServerEvent {
@@ -124,7 +128,9 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                     Err(RecvError::Closed) => break,
                 };
                 let deliver = match (&*ev, ev.device_id()) {
-                    (ServerEvent::Notice { member_id, .. }, _) => *member_id == user.id,
+                    (ServerEvent::Notice { member_id, .. } | ServerEvent::Forward { member_id, .. }, _) => {
+                        *member_id == user.id
+                    }
                     (e, _) if e.target_conn().is_some() => e.target_conn() == Some(conn.id),
                     (_, None) => true,
                     (_, Some(id)) => can_see(id) && match &conn.subs {

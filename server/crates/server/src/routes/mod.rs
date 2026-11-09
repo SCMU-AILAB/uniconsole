@@ -1,6 +1,7 @@
 //! REST API：所有路由挂在 `/api/v1` 下，JSON 字段为 snake_case。
 //! 完整清单见 `server/docs/API.md`。
 
+mod agent;
 mod alerts;
 mod auth;
 mod devices;
@@ -11,9 +12,9 @@ mod maintenance;
 mod me;
 mod members;
 mod missions;
-mod planned;
 mod recordings;
 mod safety;
+mod webrtc;
 
 use axum::{
     Json, Router,
@@ -177,11 +178,12 @@ pub fn router(state: AppState) -> Router {
             get(maintenance::get_window).put(maintenance::put_window),
         )
         // 已规划、尚未实现（501）：智能体、对讲播报、视频信令
-        .route("/agent/{*rest}", axum::routing::any(planned::agent))
+        .route("/agent/{*rest}", axum::routing::any(agent::proxy))
+        .route("/internal/agent/events", post(agent::push_event))
         .route("/intercom/targets", get(intercom::list_targets))
         .route("/intercom/presets", get(intercom::presets))
         .route("/intercom/broadcast", post(intercom::broadcast))
-        .route("/webrtc/ice-servers", get(planned::ice_servers))
+        .route("/webrtc/ice-servers", get(webrtc::ice_servers))
         // 安全策略（Safety.dc.html）
         .route("/safety", get(safety::get))
         .route("/safety/policies", patch(safety::update_policies))
