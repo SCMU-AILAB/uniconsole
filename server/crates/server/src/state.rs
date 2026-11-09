@@ -24,6 +24,8 @@ pub struct AppState {
     pub missions: Arc<MissionRunner>,
     pub fleet_player: Arc<TimelinePlayer>,
     pub webrtc: Arc<WebrtcSessions>,
+    /// 对外 HTTP（告警 webhook、智能体服务）
+    pub http: reqwest::Client,
     pub telemetry_tx: mpsc::Sender<TelemetrySample>,
     pub login_limiter: Arc<LoginLimiter>,
 }

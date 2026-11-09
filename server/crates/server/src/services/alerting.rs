@@ -15,7 +15,7 @@ use crate::{
     services::{
         audit,
         control::{self, Actor},
-        events, recordings,
+        events, notify, recordings,
     },
     state::AppState,
 };
@@ -252,6 +252,7 @@ impl AlertEngine {
             title: rule.name.clone(),
             state: AlertState::Open,
         });
+        spawn_notify(st, alert_id);
         st.hub
             .publish(ServerEvent::changed("alerts", Some(alert_id)));
         Ok(Some(alert_id))
@@ -360,10 +361,17 @@ impl AlertEngine {
             title: message.to_owned(),
             state: AlertState::Open,
         });
+        spawn_notify(st, alert_id);
         st.hub
             .publish(ServerEvent::changed("alerts", Some(alert_id)));
         Ok(())
     }
+}
+
+/// 外部通知（webhook、值班人）放到独立任务：告警在机器人连接的读循环里产生，不能被网络请求拖住
+fn spawn_notify(st: &AppState, alert_id: Uuid) {
+    let st = st.clone();
+    tokio::spawn(async move { notify::alert_raised(&st, alert_id).await });
 }
 
 /// 告警时间线。tone：critical / warning = 触发，neutral = 自动动作与通知，info = 人工处理

@@ -7,6 +7,7 @@ pub mod fleet_timeline;
 pub mod leases;
 pub mod members;
 pub mod missions;
+pub mod notify;
 pub mod recordings;
 pub mod safety;
 pub mod sessions;

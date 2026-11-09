@@ -53,8 +53,17 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
         .execute(&db)
         .await?;
 
+    // reqwest 与 sqlx 共用 rustls：显式选 ring 作为加密实现（不引入 aws-lc 的 C 构建）
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let http = reqwest::Client::builder()
+        .user_agent(concat!("UniConsole/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .context("创建 HTTP 客户端失败")?;
+
     let hub = Arc::new(Hub::new());
     Ok(AppState {
+        http,
         leases: Arc::new(LeaseService::load(db.clone(), hub.clone()).await?),
         safety: Arc::new(SafetyService::load(&db).await?),
         alerts: Arc::new(AlertEngine::load(&db).await?),
@@ -84,6 +93,7 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
     tokio::spawn(lease_sweeper(state.clone()));
     tokio::spawn(retention_cleaner(state.clone()));
     tokio::spawn(missions::scheduler(state.clone()));
+    tokio::spawn(crate::services::notify::escalator(state.clone()));
 
     let listener = tokio::net::TcpListener::bind(cfg.bind_addr).await?;
     tracing::info!("UniConsole 服务已启动：http://{}", cfg.bind_addr);

@@ -365,8 +365,16 @@ AlertEvent = {"id": 1, "alert_id": "…", "at": "…", "tone": "critical|warning
 | GET | /alerts/{id}/history | 指标曲线 `{metric, metric_label, threshold, from, to, min_y, max_y, values: [{ts, v}]}`：触发前 30 分钟到关闭（或现在，最多触发后 2 小时） |
 | GET / POST | /alert-rules | `{name, metric, metric_label?, op: > < >= <=, threshold, duration_secs, severity, auto_action?, enabled?}` |
 | PATCH / DELETE | /alert-rules/{id} | `PATCH {enabled}` 用于开关；`auto_action: null` 清除；变化推送 `changed: alert_rules` |
-| GET / PUT | /alert-channels | `[{name, min_severity}]`（PUT 仅管理员）；实际发送尚未接入 |
+| GET / PUT | /alert-channels | `[{name, min_severity, kind?, url?, format?}]`（PUT 仅管理员），见下 |
 | GET / PUT | /on-call | `{weeks: [成员 id], escalate_after_secs, escalate_to_id}`，`weeks[0]` 是本周值班人（PUT 仅管理员） |
+
+**通知与升级**：
+- 渠道 `kind`：`in_app`（缺省，应用内推送，靠 WS `alert`）或 `webhook`：告警达到 `min_severity` 时 POST 到 `url`，
+  `format` 为 `json`（缺省，`{text, alert}`）/ `feishu` / `dingtalk` / `wecom` / `slack`（纯文本消息）。
+  非管理员 GET 时 `url` 只显示协议和主机（地址里通常带密钥）。
+- 告警触发（warning 及以上）时给本周值班人发 `notice`。
+- 超过 `escalate_after_secs` 仍是 `open`（未确认、未静默）的告警升级一次：给 `escalate_to_id` 发 `notice`，再走一遍 webhook。
+- 每次通知、失败原因、升级都写进告警时间线（`tone: neutral`），并推 `changed: alerts`。
 
 `PATCH /alerts/{id}` 的操作（观察者 403）：
 

@@ -21,7 +21,7 @@ use crate::{
         alerting::{AUTO_ACTIONS, add_event, default_metric_label},
         audit,
         control::{self, Actor, CommandResult},
-        events, settings,
+        events, notify, settings,
     },
     state::AppState,
     util::double_option,
@@ -537,37 +537,29 @@ pub async fn delete_rule(
 
 // ───────── 通知渠道与值班（告警页右栏） ─────────
 
-pub async fn get_channels(State(st): State<AppState>, _user: AuthUser) -> AppResult<Json<Value>> {
-    Ok(Json(
-        settings::get(
-            &st,
-            "alert_channels",
-            json!([{ "name": "应用内推送", "min_severity": "info" }]),
-        )
-        .await?,
-    ))
+pub async fn get_channels(State(st): State<AppState>, user: AuthUser) -> AppResult<Json<Value>> {
+    let v = settings::get(
+        &st,
+        "alert_channels",
+        json!([{ "name": "应用内推送", "min_severity": "info" }]),
+    )
+    .await?;
+    // webhook 地址里带密钥，只有管理员能看到完整地址
+    Ok(Json(if user.require(Perm::ManageMembers).is_ok() {
+        v
+    } else {
+        notify::mask_channels(&v)
+    }))
 }
 
+/// PUT /alert-channels（仅管理员）：`[{name, min_severity, kind?: in_app|webhook, url?, format?}]`
 pub async fn put_channels(
     State(st): State<AppState>,
     user: AuthUser,
     Json(v): Json<Value>,
 ) -> AppResult<Json<Value>> {
     user.require(Perm::ManageMembers)?;
-    let ok = v.as_array().is_some_and(|a| {
-        a.iter().all(|c| {
-            c["name"].is_string()
-                && matches!(
-                    c["min_severity"].as_str(),
-                    Some("critical" | "warning" | "info")
-                )
-        })
-    });
-    if !ok {
-        return Err(AppError::bad_request(
-            "格式应为 [{name, min_severity: critical|warning|info}]",
-        ));
-    }
+    notify::validate_channels(&v).map_err(AppError::bad_request)?;
     settings::put(&st, "alert_channels", &v).await?;
     audit::record(
         &st,
@@ -575,7 +567,7 @@ pub async fn put_channels(
         audit::Kind::Config,
         "修改告警通知渠道",
         "通知渠道",
-        v.clone(),
+        notify::mask_channels(&v),
     )
     .await;
     st.hub
