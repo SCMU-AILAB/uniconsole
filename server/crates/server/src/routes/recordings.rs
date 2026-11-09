@@ -3,9 +3,8 @@
 
 use axum::{
     Json,
-    body::Body,
     extract::{Path, Query, State},
-    http::{StatusCode, header},
+    http::StatusCode,
     response::Response,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -283,7 +282,7 @@ pub async fn export(
     }
     let r = load(&st, id).await?;
     let now = Utc::now();
-    let token = export::link_token(&st.cfg.jwt_secret, id, now);
+    let token = export::link_token(&st.cfg.jwt_secret, &format!("recording:{id}"), now);
     audit::record(
         &st,
         &user,
@@ -311,40 +310,17 @@ pub async fn download(
     Path(id): Path<Uuid>,
     Query(q): Query<DownloadQuery>,
 ) -> AppResult<Response> {
-    if !export::verify_token(&st.cfg.jwt_secret, id, &q.token, Utc::now()) {
+    if !export::verify_token(
+        &st.cfg.jwt_secret,
+        &format!("recording:{id}"),
+        &q.token,
+        Utc::now(),
+    ) {
         return Err(AppError::forbidden("下载链接无效或已过期，请重新导出"));
     }
     let r = load(&st, id).await?;
     let bytes = export::build_mcap(&st, &r).await?;
-    let name = export::filename(&r);
-    let ascii: String = name
-        .chars()
-        .map(|c| {
-            if c.is_ascii_graphic() && c != '"' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    let encoded: String = name
-        .bytes()
-        .map(|b| {
-            if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
-                (b as char).to_string()
-            } else {
-                format!("%{b:02X}")
-            }
-        })
-        .collect();
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/octet-stream")
-        .header(
-            header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"),
-        )
-        .body(Body::from(bytes))
-        .map_err(|e| AppError::Internal(e.into()))
+    export::attachment(&export::filename(&r), "application/octet-stream", bytes)
 }
 
 /// GET /recordings/storage

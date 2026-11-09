@@ -172,6 +172,10 @@ pub fn router(state: AppState) -> Router {
         .route("/devices/{id}/reboot", post(maintenance::reboot))
         .route("/devices/{id}/terminal", post(maintenance::terminal))
         .route("/diagnostics", post(maintenance::diagnostics))
+        .route(
+            "/diagnostics/download",
+            get(maintenance::diagnostics_download),
+        )
         .route("/battery-health", get(maintenance::battery_health))
         .route("/logs", get(maintenance::logs))
         .route(

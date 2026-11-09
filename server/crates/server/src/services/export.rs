@@ -10,12 +10,12 @@
 
 use std::{collections::BTreeMap, io::Cursor};
 
+use axum::{body::Body, http::header, response::Response};
 use chrono::{DateTime, Utc};
 use data_encoding::BASE64URL_NOPAD;
 use hmac::{Hmac, KeyInit, Mac};
 use serde_json::{Value, json};
 use sha2::Sha256;
-use uuid::Uuid;
 
 use crate::{
     error::{AppError, AppResult},
@@ -26,19 +26,19 @@ use crate::{
 /// 下载链接有效期
 pub const LINK_TTL_SECS: i64 = 15 * 60;
 
-fn sign(secret: &str, id: Uuid, exp: i64) -> String {
+fn sign(secret: &str, purpose: &str, exp: i64) -> String {
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("hmac key");
-    mac.update(format!("recording-export:{id}:{exp}").as_bytes());
+    mac.update(format!("download:{purpose}:{exp}").as_bytes());
     BASE64URL_NOPAD.encode(&mac.finalize().into_bytes())
 }
 
-/// 生成下载令牌 `<过期时间戳>.<签名>`
-pub fn link_token(secret: &str, id: Uuid, now: DateTime<Utc>) -> String {
+/// 生成下载令牌 `<过期时间戳>.<签名>`。`purpose` 标明下载的是什么（如 `recording:<id>`），换了内容签名就对不上
+pub fn link_token(secret: &str, purpose: &str, now: DateTime<Utc>) -> String {
     let exp = now.timestamp() + LINK_TTL_SECS;
-    format!("{exp}.{}", sign(secret, id, exp))
+    format!("{exp}.{}", sign(secret, purpose, exp))
 }
 
-pub fn verify_token(secret: &str, id: Uuid, token: &str, now: DateTime<Utc>) -> bool {
+pub fn verify_token(secret: &str, purpose: &str, token: &str, now: DateTime<Utc>) -> bool {
     let Some((exp, sig)) = token.split_once('.') else {
         return false;
     };
@@ -48,13 +48,45 @@ pub fn verify_token(secret: &str, id: Uuid, token: &str, now: DateTime<Utc>) -> 
     if exp < now.timestamp() {
         return false;
     }
-    let expected = sign(secret, id, exp);
+    let expected = sign(secret, purpose, exp);
     expected.len() == sig.len()
         && expected
             .bytes()
             .zip(sig.bytes())
             .fold(0u8, |acc, (a, b)| acc | (a ^ b))
             == 0
+}
+
+/// 附件下载响应，文件名兼容中文（RFC 6266 `filename*`）
+pub fn attachment(name: &str, content_type: &str, bytes: Vec<u8>) -> AppResult<Response> {
+    let ascii: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_graphic() && c != '"' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let encoded: String = name
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect();
+    Response::builder()
+        .header(header::CONTENT_TYPE, content_type)
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"),
+        )
+        .body(Body::from(bytes))
+        .map_err(|e| AppError::Internal(e.into()))
 }
 
 /// 文件名：录制名里的路径分隔符等替换掉
@@ -216,18 +248,17 @@ mod tests {
 
     #[test]
     fn link_tokens() {
-        let id = Uuid::new_v4();
         let now = Utc::now();
-        let tok = link_token("secret", id, now);
-        assert!(verify_token("secret", id, &tok, now));
-        assert!(!verify_token("other", id, &tok, now));
-        assert!(!verify_token("secret", Uuid::new_v4(), &tok, now));
+        let tok = link_token("secret", "recording:1", now);
+        assert!(verify_token("secret", "recording:1", &tok, now));
+        assert!(!verify_token("other", "recording:1", &tok, now));
+        assert!(!verify_token("secret", "recording:2", &tok, now));
         assert!(!verify_token(
             "secret",
-            id,
+            "recording:1",
             &tok,
             now + chrono::Duration::seconds(LINK_TTL_SECS + 1)
         ));
-        assert!(!verify_token("secret", id, "garbage", now));
+        assert!(!verify_token("secret", "recording:1", "garbage", now));
     }
 }

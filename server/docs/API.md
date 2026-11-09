@@ -494,7 +494,8 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 | GET / PUT | /firmware/release | `{latest: {"Unitree Go2 EDU": "v1.1.8"}, agent_version, notes: []}`（PUT 仅管理员） |
 | POST | /firmware/upgrade · /firmware/schedule | → **501**（需要机器人端 OTA） |
 | POST | /devices/{id}/rollback · /reboot · /terminal | → **501** |
-| POST | /diagnostics | → **501** |
+| POST | /diagnostics | `{device_ids}`（1–50 台，需要「固件升级与远程终端」权限）→ `{url, filename, expires_at}`：服务端诊断包的签名下载链接 |
+| GET | /diagnostics/download?devices=&token= | 下载诊断包 JSON（15 分钟有效，不需要 Authorization 头）：每台设备的设备信息、控制权、实时状态与最新遥测、最近 500 条日志、200 条事件、24 小时指令、7 天告警、1 小时遥测摘要，以及安全策略 |
 | GET | /battery-health | `[{device_id, cycles: null, monthly: []}]`（机器人端尚未上报电池数据） |
 | GET | /logs?device_id=&level=info\|warn\|error&limit= | `[{at, level, device_id, message}]`，来自机器人上报的事件 |
 | GET / PUT | /maintenance-window | `{start_min, end_min}` 距零点的分钟数，可跨零点（默认 23:00–03:00） |
@@ -532,7 +533,7 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 | 接口 | 说明 |
 |---|---|
 | `POST /maps/{id}/remap` | 需要机器人端 SLAM 建图 |
-| `POST /firmware/upgrade` · `/firmware/schedule`、`/devices/{id}/rollback` · `/reboot` · `/terminal`、`POST /diagnostics` | 需要机器人端 OTA / 运维能力 |
+| `POST /firmware/upgrade` · `/firmware/schedule`、`/devices/{id}/rollback` · `/reboot` · `/terminal` | 需要机器人端 OTA / 受控 shell |
 
 ### 交接文档 §16 的七项决定
 

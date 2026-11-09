@@ -1,11 +1,13 @@
 //! 设备运维（Maintenance.dc.html）。
-//! 固件升级 / 回滚 / 重启 / 远程终端 / 诊断包需要机器人端 OTA 与受控 shell 能力，暂返回 501。
+//! 固件升级 / 回滚 / 重启 / 远程终端需要机器人端 OTA 与受控 shell 能力，暂返回 501；
+//! 诊断包由服务端汇总已有数据（JSON）。
 
 use axum::{
     Json,
     extract::{Path, Query, State},
     http::StatusCode,
 };
+use chrono::Utc;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -14,7 +16,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{DeviceLog, DeviceRow},
     protocol::ServerEvent,
-    services::{access, audit, settings},
+    services::{access, audit, export, settings},
     state::AppState,
 };
 
@@ -104,8 +106,120 @@ pub async fn terminal(_user: AuthUser, Path(_id): Path<String>) -> AppResult<Sta
         "远程终端（需要机器人端受控 shell 与二次验证）",
     ))
 }
-pub async fn diagnostics(_user: AuthUser) -> AppResult<StatusCode> {
-    Err(AppError::not_implemented("诊断包导出"))
+#[derive(Deserialize)]
+pub struct DiagnosticsReq {
+    pub device_ids: Vec<String>,
+}
+
+fn diag_purpose(ids: &[String]) -> String {
+    format!("diagnostics:{}", ids.join(","))
+}
+
+fn diag_filename(ids: &[String]) -> String {
+    let who = match ids {
+        [one] => one.clone(),
+        _ => format!("{}-devices", ids.len()),
+    };
+    format!("diag_{who}_{}.json", Utc::now().format("%Y%m%d_%H%M"))
+}
+
+/// POST /diagnostics `{device_ids}` → `{url, filename, expires_at}`：服务端诊断包（JSON）的签名下载链接
+pub async fn diagnostics(
+    State(st): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<DiagnosticsReq>,
+) -> AppResult<Json<Value>> {
+    let mut ids = req.device_ids;
+    ids.sort();
+    ids.dedup();
+    if ids.is_empty() || ids.len() > 50 {
+        return Err(AppError::bad_request("device_ids 需要 1–50 台设备"));
+    }
+    for id in &ids {
+        access::require_device(&st.db, &user, Perm::Maintenance, id).await?;
+    }
+    let now = Utc::now();
+    let token = export::link_token(&st.cfg.jwt_secret, &diag_purpose(&ids), now);
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        format!("导出诊断包（{} 台设备）", ids.len()),
+        ids.join("、"),
+        json!({ "device_ids": ids }),
+    )
+    .await;
+    Ok(Json(json!({
+        "url": format!("/api/v1/diagnostics/download?devices={}&token={token}", ids.join(",")),
+        "filename": diag_filename(&ids),
+        "expires_at": now + chrono::Duration::seconds(export::LINK_TTL_SECS),
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct DiagnosticsDownload {
+    pub devices: String,
+    pub token: String,
+}
+
+/// GET /diagnostics/download?devices=&token=：按签名链接下载诊断包（不需要登录态）
+pub async fn diagnostics_download(
+    State(st): State<AppState>,
+    Query(q): Query<DiagnosticsDownload>,
+) -> AppResult<axum::response::Response> {
+    let ids: Vec<String> = q.devices.split(',').map(str::to_owned).collect();
+    if !export::verify_token(
+        &st.cfg.jwt_secret,
+        &diag_purpose(&ids),
+        &q.token,
+        Utc::now(),
+    ) {
+        return Err(AppError::forbidden("下载链接无效或已过期，请重新导出"));
+    }
+    let mut devices = Vec::with_capacity(ids.len());
+    for id in &ids {
+        let report: Value = sqlx::query_scalar(
+            "SELECT jsonb_build_object(
+               'device', (SELECT to_jsonb(d) - 'token_hash' FROM devices d WHERE d.id = $1),
+               'lease', (SELECT to_jsonb(l) FROM leases l WHERE l.device_id = $1),
+               'logs', COALESCE((SELECT jsonb_agg(x) FROM (SELECT at, level, message FROM device_logs
+                        WHERE device_id = $1 ORDER BY at DESC LIMIT 500) x), '[]'),
+               'events', COALESCE((SELECT jsonb_agg(x) FROM (SELECT at, text, tone FROM device_events
+                        WHERE device_id = $1 ORDER BY at DESC LIMIT 200) x), '[]'),
+               'commands', COALESCE((SELECT jsonb_agg(x) FROM (SELECT created_at, actor_name, command, ok, error, error_code
+                        FROM command_log WHERE device_id = $1 AND created_at > now() - interval '24 hours'
+                        ORDER BY created_at DESC LIMIT 500) x), '[]'),
+               'alerts', COALESCE((SELECT jsonb_agg(x) FROM (SELECT id, severity, state, title, metric, peak, created_at, closed_at
+                        FROM alerts WHERE device_id = $1 AND created_at > now() - interval '7 days'
+                        ORDER BY created_at DESC LIMIT 100) x), '[]'),
+               'telemetry_last_hour', COALESCE((SELECT jsonb_agg(x) FROM (SELECT ts, battery, voltage, current, max_motor_temp
+                        FROM telemetry WHERE device_id = $1 AND ts > now() - interval '1 hour' ORDER BY ts) x), '[]'))",
+        )
+        .bind(id)
+        .fetch_one(&st.db)
+        .await?;
+        let live = st.hub.live(id);
+        let mut report = report;
+        report["live"] = json!({
+            "online": st.hub.is_online(id),
+            "estop": st.hub.is_device_estopped(id),
+            "latency_ms": live.latency_ms,
+            "telemetry": live.telemetry,
+        });
+        devices.push(report);
+    }
+    let body = json!({
+        "generated_at": Utc::now(),
+        "server_version": env!("CARGO_PKG_VERSION"),
+        "global_estop": st.safety.is_global_estop(),
+        "policies": st.safety.policies(),
+        "devices": devices,
+    });
+    export::attachment(
+        &diag_filename(&ids),
+        "application/json",
+        serde_json::to_vec_pretty(&body).map_err(|e| AppError::Internal(e.into()))?,
+    )
 }
 
 /// GET /battery-health：机器人端尚未上报电池循环次数 / 满充容量，返回空数据
