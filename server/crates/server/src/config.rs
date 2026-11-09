@@ -43,7 +43,7 @@ pub struct Config {
     pub smtp_url: Option<String>,
     /// 发件人，如 `UniConsole <noreply@silencecf.me>`
     pub mail_from: String,
-    /// 是否开放邮箱自助注册（注册后仍需管理员审核）
+    /// 是否开放邮箱自助注册（注册即为观察者，管理员再调整角色）
     pub registration_enabled: bool,
     /// 首次启动时若没有任何成员则创建管理员
     pub bootstrap_admin: Option<(String, String)>,

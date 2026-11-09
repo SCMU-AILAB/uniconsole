@@ -65,7 +65,7 @@
 | GET | /auth/invites/{token} | 邀请页信息 `{handle, name, expires_at}`；无效或过期 404 | 公开 |
 | POST | /auth/invites/{token}/accept | `{password, device_name?}` → `LoginResponse`（设置密码并直接登录） | 公开 |
 | POST | /auth/register/code | `{email}` → `{expires_in: 600, resend_after: 60}`，向邮箱发 6 位验证码 | 公开 |
-| POST | /auth/register | `{email, code, handle, name, password}` → 201 `{member, pending_approval: true}`；需管理员审核后才能登录 | 公开 |
+| POST | /auth/register | `{email, code, handle, name, password, device_name?}` → 201 `LoginResponse`（观察者，直接登录） | 公开 |
 
 ```json
 // POST /auth/login
@@ -80,7 +80,6 @@
   - 401 `two_factor_required`：显示验证码输入框，带 `code` 再提交一次
   - 401 `two_factor_invalid`「二次验证码错误」
   - 403 `forbidden`「账号已停用」/「账号已过期」
-  - 403 `pending_approval`「账号正在等待管理员审核，通过后会邮件通知你」（密码正确时才会返回）
   - 429 `too_many_requests`「登录失败次数过多，请 N 秒后再试」
 - 密码规则：8–128 个字符（400「密码至少 8 位」）。
 - **邀请**：管理员邀请成员时不设密码，拿到 `invite_url`（`uniconsole://invite/<token>`，7 天有效、只能用一次）。
@@ -93,10 +92,9 @@
   2. `POST /auth/register`：错误 400「验证码错误」/「验证码无效或已过期，请重新获取」/
      「验证码错误次数过多，请重新获取」（错 5 次作废）、409「账号 @x 已被使用」/「该邮箱已注册，请直接登录」，
      以及账号、名字、密码的格式错误（同邀请）。账号重名时验证码不会被消耗，改个账号再提交即可。
-  3. 新账号角色为 `viewer`、`pending_approval: true`，**不返回令牌**；前端显示「已提交，等待管理员审核」。
-     在线管理员收到 `notice`「林悦（x@y.com）申请注册，等待审核」，成员列表收到 `changed`。
-  4. 管理员 `POST /members/{id}/approve {role, device_ids?}` 通过（对方收到「账号已通过审核」邮件），
-     或 `DELETE /members/{id}` 拒绝。之后可用账号或邮箱登录。
+  3. 成功即登录（同 `/auth/login` 的 `LoginResponse`），角色固定为 `viewer`（只能看，不能控制）。
+     在线管理员收到 `notice`「林悦（x@y.com）注册成为观察者，可在成员与权限里调整角色」，成员列表收到 `changed`；
+     管理员用 `PATCH /members/{id} {role}` 调整角色。
 
 ### 当前账户（设置页）
 
@@ -130,7 +128,6 @@ Member = {
   "two_factor": false,
   "pending_invite": false,       // 已邀请、尚未设置密码
   "email": "linyue@example.com", // 邮箱注册的账号才有；只有管理员和本人看得到，其他人为 null
-  "pending_approval": false,     // 邮箱注册、等待管理员审核（前端在成员列表里显示「通过 / 拒绝」）
   "created_at": "…"
 }
 ```
@@ -141,7 +138,6 @@ Member = {
 | GET | /members/{id} | `Member` | 登录 |
 | POST | /members | `{handle, name, role, password?, color?, expires_at?, video_only?, guest_link?, device_ids?}` → 201 `{member, invite_url, invite_expires_at}`。不传 `password` 时生成邀请链接（推荐），传了则直接激活、`invite_url` 为 null | 管理员 |
 | POST | /members/{id}/invite | 重新生成邀请链接（旧链接作废）→ `{invite_url, invite_expires_at}`；已激活 409 | 管理员 |
-| POST | /members/{id}/approve | 通过邮箱注册申请 `{role, device_ids?}` → `Member`；不在待审核状态 409。拒绝用 DELETE | 管理员 |
 | PATCH | /members/{id} | `{name?, role?, color?, expires_at?, disabled?, video_only?, guest_link?}`；`expires_at: null` 表示改为长期 | 管理员；本人可改 `name` / `color` |
 | DELETE | /members/{id} | → 204 | 管理员 |
 | GET / PUT | /members/{id}/devices | 授权设备 `{device_ids: []}` | 管理员；设备管理者只能增减自己管理的设备 |

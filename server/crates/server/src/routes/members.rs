@@ -62,66 +62,6 @@ pub async fn get(
 }
 
 #[derive(Deserialize)]
-pub struct Approve {
-    /// 通过后的角色
-    pub role: Role,
-    /// 同时授权的设备（可选）
-    #[serde(default)]
-    pub device_ids: Vec<String>,
-}
-
-/// POST /members/{id}/approve：通过邮箱注册的申请（仅管理员）。拒绝 = DELETE /members/{id}
-pub async fn approve(
-    State(st): State<AppState>,
-    user: AuthUser,
-    Path(id): Path<Uuid>,
-    Json(req): Json<Approve>,
-) -> AppResult<Json<Member>> {
-    user.require(Perm::ManageMembers)?;
-    let row: MemberRow = sqlx::query_as(
-        "UPDATE members SET pending_approval = FALSE, role = $2
-         WHERE id = $1 AND pending_approval RETURNING *",
-    )
-    .bind(id)
-    .bind(req.role)
-    .fetch_optional(&st.db)
-    .await?
-    .ok_or_else(|| AppError::conflict("该成员不在待审核状态"))?;
-    if !req.device_ids.is_empty() {
-        set_grants(&st, id, &req.device_ids).await?;
-    }
-    audit::record(
-        &st,
-        &user,
-        audit::Kind::Config,
-        format!(
-            "通过了 {} 的注册申请，角色为{}",
-            row.name,
-            role_label(row.role)
-        ),
-        &row.name,
-        json!({ "role": row.role, "email": row.email }),
-    )
-    .await;
-    if let Some(email) = row.email.clone() {
-        let st2 = st.clone();
-        let (name, handle, role) = (row.name.clone(), row.handle.clone(), role_label(row.role));
-        tokio::spawn(async move {
-            let body = format!(
-                "{name}，你好：\n\n你的 UniConsole 账号 @{handle} 已通过管理员审核，角色为{role}。\n\
-                 现在可以用账号或邮箱 {email} 登录。\n\n— UniConsole"
-            );
-            let _ = st2
-                .mailer
-                .send(&email, "UniConsole 账号已通过审核", body)
-                .await;
-        });
-    }
-    changed(&st, id);
-    Ok(Json(members::load(&st, id).await?))
-}
-
-#[derive(Deserialize)]
 pub struct CreateMember {
     pub handle: String,
     pub name: String,

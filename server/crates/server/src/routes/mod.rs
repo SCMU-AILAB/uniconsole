@@ -64,7 +64,6 @@ pub fn router(state: AppState) -> Router {
                 .delete(members::remove),
         )
         .route("/members/{id}/invite", post(members::reinvite))
-        .route("/members/{id}/approve", post(members::approve))
         .route(
             "/members/{id}/devices",
             get(members::grants).put(members::put_grants),

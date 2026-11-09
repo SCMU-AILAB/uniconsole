@@ -60,8 +60,6 @@ pub struct MemberRow {
     pub guest_link: bool,
     /// 自助注册时验证过的邮箱（小写）；也可以用它登录
     pub email: Option<String>,
-    /// 邮箱注册、等待管理员审核（审核前不能登录）
-    pub pending_approval: bool,
 }
 
 impl MemberRow {
@@ -94,8 +92,6 @@ pub struct Member {
     pub pending_invite: bool,
     /// 邮箱（只有管理员和本人看得到，其他人看到 null）
     pub email: Option<String>,
-    /// 邮箱注册、等待管理员审核
-    pub pending_approval: bool,
     pub created_at: DateTime<Utc>,
 }
 
@@ -117,7 +113,6 @@ impl Member {
             last_seen: r.last_seen_at,
             two_factor: r.two_factor,
             email: r.email,
-            pending_approval: r.pending_approval,
             created_at: r.created_at,
         }
     }

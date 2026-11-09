@@ -231,7 +231,7 @@ pub async fn change_password(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ───────── 邮箱注册（验证邮箱 → 管理员审核 → 可登录）─────────
+// ───────── 邮箱注册（验证邮箱 → 观察者账号，管理员再调整角色）─────────
 
 fn ensure_registration(st: &AppState) -> AppResult<()> {
     if st.cfg.registration_enabled {
@@ -294,13 +294,15 @@ pub struct RegisterReq {
     pub handle: String,
     pub name: String,
     pub password: String,
+    pub device_name: Option<String>,
 }
 
-/// POST /auth/register：校验验证码并创建账号（待管理员审核，审核前不能登录）
+/// POST /auth/register：校验验证码，创建观察者账号并直接登录。角色由管理员之后在「成员与权限」里调整
 pub async fn register(
     State(st): State<AppState>,
+    info: ClientInfo,
     Json(req): Json<RegisterReq>,
-) -> AppResult<(StatusCode, Json<serde_json::Value>)> {
+) -> AppResult<(StatusCode, Json<LoginResponse>)> {
     ensure_registration(&st)?;
     let email =
         normalize_email(&req.email).ok_or_else(|| AppError::bad_request("邮箱格式不正确"))?;
@@ -326,8 +328,8 @@ pub async fn register(
     email_codes::consume(&st, PURPOSE_REGISTER, &email, &req.code).await?;
     let hash = auth::hash_password_async(req.password).await?;
     let row: MemberRow = sqlx::query_as(
-        "INSERT INTO members (handle, name, password_hash, role, email, pending_approval)
-         VALUES ($1, $2, $3, 'viewer', $4, TRUE) RETURNING *",
+        "INSERT INTO members (handle, name, password_hash, role, email)
+         VALUES ($1, $2, $3, 'viewer', $4) RETURNING *",
     )
     .bind(&handle)
     .bind(name)
@@ -343,7 +345,7 @@ pub async fn register(
     audit::record_system(
         &st,
         audit::Kind::Config,
-        format!("{name}（{email}）通过邮箱注册，等待审核"),
+        format!("{name}（{email}）通过邮箱注册，角色为观察者"),
         name,
         json!({ "handle": handle, "email": email }),
     )
@@ -353,26 +355,22 @@ pub async fn register(
         "members",
         Some(row.id),
     ));
-    Ok((
-        StatusCode::CREATED,
-        Json(json!({
-            "member": members::view(&st, row).await?,
-            "pending_approval": true,
-        })),
-    ))
+    let resp = sessions::login_response(&st, row, &info, req.device_name).await?;
+    Ok((StatusCode::CREATED, Json(resp)))
 }
 
-/// 新注册申请：在线管理员弹提示，有邮箱的管理员再发一封邮件
+/// 有人注册：在线管理员弹提示，有邮箱的管理员再发一封邮件
 async fn notify_admins(st: &AppState, row: &MemberRow) {
-    let admins: Vec<(uuid::Uuid, Option<String>)> = sqlx::query_as(
-        "SELECT id, email FROM members
-         WHERE role = 'admin' AND NOT disabled AND NOT pending_approval",
-    )
-    .fetch_all(&st.db)
-    .await
-    .unwrap_or_default();
+    let admins: Vec<(uuid::Uuid, Option<String>)> =
+        sqlx::query_as("SELECT id, email FROM members WHERE role = 'admin' AND NOT disabled")
+            .fetch_all(&st.db)
+            .await
+            .unwrap_or_default();
     let email = row.email.clone().unwrap_or_default();
-    let text = format!("{}（{email}）申请注册，等待审核", row.name);
+    let text = format!(
+        "{}（{email}）注册成为观察者，可在成员与权限里调整角色",
+        row.name
+    );
     for (id, admin_email) in admins {
         st.hub.publish(crate::protocol::ServerEvent::Notice {
             member_id: id,
@@ -381,12 +379,9 @@ async fn notify_admins(st: &AppState, row: &MemberRow) {
         });
         if let Some(to) = admin_email {
             let st = st.clone();
-            let body = format!(
-                "{text}。\n\n账号：@{}\n请在「成员与权限」里通过或拒绝。\n\n— UniConsole",
-                row.handle
-            );
+            let body = format!("{text}。\n\n账号：@{}\n\n— UniConsole", row.handle);
             tokio::spawn(async move {
-                let _ = st.mailer.send(&to, "UniConsole 新的注册申请", body).await;
+                let _ = st.mailer.send(&to, "UniConsole 新成员注册", body).await;
             });
         }
     }
