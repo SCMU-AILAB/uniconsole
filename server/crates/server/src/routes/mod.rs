@@ -159,6 +159,7 @@ pub fn router(state: AppState) -> Router {
         .route("/recordings/{id}/samples", get(recordings::samples))
         .route("/recordings/{id}/clip", post(recordings::clip))
         .route("/recordings/{id}/export", post(recordings::export))
+        .route("/recordings/{id}/download", get(recordings::download))
         // 设备运维（Maintenance.dc.html）
         .route("/firmware", get(maintenance::firmware))
         .route(

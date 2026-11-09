@@ -3,6 +3,7 @@ pub mod alerting;
 pub mod audit;
 pub mod control;
 pub mod events;
+pub mod export;
 pub mod fleet_timeline;
 pub mod geofence;
 pub mod leases;

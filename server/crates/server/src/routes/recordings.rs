@@ -1,10 +1,12 @@
 //! 录制与回放（Replay.dc.html）。
-//! 当前录制内容 = 服务端 1 Hz 遥测 + 指令日志；视频 / 点云 / 导出 MCAP 需要机器人端录制，返回 501。
+//! 当前录制内容 = 服务端 1 Hz 遥测 + 指令日志 + 设备事件，可导出 MCAP；视频 / 点云需要机器人端录制。
 
 use axum::{
     Json,
+    body::Body,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{StatusCode, header},
+    response::Response,
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
@@ -14,9 +16,10 @@ use uuid::Uuid;
 use crate::{
     auth::{AuthUser, Perm},
     error::{AppError, AppResult},
+    extract::MaybeJson,
     models::RecordingRow,
     protocol::ServerEvent,
-    services::{access, audit, recordings, settings},
+    services::{access, audit, export, recordings, settings},
     state::AppState,
 };
 
@@ -250,9 +253,98 @@ pub async fn clip(
     Ok((StatusCode::CREATED, Json(json!({ "id": n.id }))))
 }
 
-/// POST /recordings/{id}/export：导出 MCAP / rosbag（需要机器人端原始录制）
-pub async fn export(_user: AuthUser, Path(_id): Path<Uuid>) -> AppResult<StatusCode> {
-    Err(AppError::not_implemented("导出 MCAP / rosbag"))
+#[derive(Deserialize, Default)]
+pub struct ExportReq {
+    /// mcap（缺省）| rosbag
+    pub format: Option<String>,
+}
+
+/// POST /recordings/{id}/export `{format?}` → `{url, filename, expires_at}`：
+/// 生成 15 分钟有效的下载链接（`url` 是相对服务器地址的路径，无需 Authorization 头）
+pub async fn export(
+    State(st): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    body: MaybeJson<ExportReq>,
+) -> AppResult<Json<Value>> {
+    user.require(Perm::ViewSensors)?;
+    let format = body
+        .into_inner()
+        .and_then(|b| b.format)
+        .unwrap_or_else(|| "mcap".into());
+    match format.as_str() {
+        "mcap" => {}
+        "rosbag" => {
+            return Err(AppError::not_implemented(
+                "导出 rosbag（请先导出 MCAP，再用 mcap convert 转换）",
+            ));
+        }
+        _ => return Err(AppError::bad_request("format 只能是 mcap 或 rosbag")),
+    }
+    let r = load(&st, id).await?;
+    let now = Utc::now();
+    let token = export::link_token(&st.cfg.jwt_secret, id, now);
+    audit::record(
+        &st,
+        &user,
+        audit::Kind::Config,
+        format!("导出录制「{}」（MCAP）", r.name),
+        &r.name,
+        json!({ "recording_id": id }),
+    )
+    .await;
+    Ok(Json(json!({
+        "url": format!("/api/v1/recordings/{id}/download?token={token}"),
+        "filename": export::filename(&r),
+        "expires_at": now + Duration::seconds(export::LINK_TTL_SECS),
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct DownloadQuery {
+    pub token: String,
+}
+
+/// GET /recordings/{id}/download?token=：按签名链接下载 MCAP（不需要登录态）
+pub async fn download(
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<DownloadQuery>,
+) -> AppResult<Response> {
+    if !export::verify_token(&st.cfg.jwt_secret, id, &q.token, Utc::now()) {
+        return Err(AppError::forbidden("下载链接无效或已过期，请重新导出"));
+    }
+    let r = load(&st, id).await?;
+    let bytes = export::build_mcap(&st, &r).await?;
+    let name = export::filename(&r);
+    let ascii: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_graphic() && c != '"' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let encoded: String = name
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect();
+    Response::builder()
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"),
+        )
+        .body(Body::from(bytes))
+        .map_err(|e| AppError::Internal(e.into()))
 }
 
 /// GET /recordings/storage

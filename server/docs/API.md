@@ -475,12 +475,16 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 | GET / DELETE | /recordings/{id} | |
 | GET | /recordings/{id}/samples | 等分 120 点：`{chart_title, device_id, temperature[], velocity[], trajectory: [[x,y]], cloud: []}`（无数据的点为 null） |
 | POST | /recordings/{id}/clip | `{from_ms, to_ms, name?}` → `{id}` |
-| POST | /recordings/{id}/export | → **501** |
+| POST | /recordings/{id}/export | `{format?: "mcap" \| "rosbag"}`（可不带 body，缺省 mcap）→ `{url, filename, expires_at}`；rosbag → 501 |
+| GET | /recordings/{id}/download?token= | 下载 MCAP（`export` 返回的 `url`，相对服务器地址；15 分钟有效，**不需要** Authorization 头）；链接无效或过期 403 |
 | GET | /recordings/storage | `{used_bytes, total_bytes: null, retention_days, auto_rules}` |
 
 - 自动录制：告警触发时录前后 60 秒（`alert.recording_id`），联调会话结束时录整段。
 - 遥测、指令日志、设备日志、设备事件保留 `retention_days`（默认 30 天），每小时清理一次。
 - 分享链接由前端生成 `uniconsole://replay/{id}?t=<秒>`。变化推送 `changed: recordings`。
+- **MCAP 导出**（Foxglove Studio 可直接打开）：每个 topic 一个 JSON 通道，时间戳为纳秒——
+  `/{device_id}/telemetry`（遥测完整报文，1 Hz）、`/{device_id}/commands`（`{actor, command, ok, error}`）、
+  `/{device_id}/events`（`{text, tone}`）。需要 rosbag 时可用 `mcap convert` 转换。
 
 ### 设备运维（Maintenance.dc.html）
 
@@ -528,7 +532,6 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 | 接口 | 说明 |
 |---|---|
 | `POST /maps/{id}/remap` | 需要机器人端 SLAM 建图 |
-| `POST /recordings/{id}/export` | 导出 MCAP / rosbag |
 | `POST /firmware/upgrade` · `/firmware/schedule`、`/devices/{id}/rollback` · `/reboot` · `/terminal`、`POST /diagnostics` | 需要机器人端 OTA / 运维能力 |
 
 ### 交接文档 §16 的七项决定
