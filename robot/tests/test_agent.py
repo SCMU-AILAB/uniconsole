@@ -239,3 +239,14 @@ def test_say_allowed_during_estop():
     run(c.handle(ActionCmd(name="say", params={"text": "请注意"})))
     with pytest.raises(CommandRejected):
         run(c.handle(ActionCmd(name="hello")))
+
+
+def test_parse_zones():
+    from uniagent.protocol import ZonesMsg
+
+    msg = ServerMessageAdapter.validate_json(
+        json.dumps(
+            {"type": "zones", "zones": [{"id": "z", "zone_type": "ban", "polygon": [[0, 0], [1, 0], [1, 1]]}]}
+        )
+    )
+    assert isinstance(msg, ZonesMsg) and msg.zones[0]["zone_type"] == "ban"

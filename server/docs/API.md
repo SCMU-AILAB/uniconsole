@@ -319,6 +319,15 @@ Receipt = {"label": "同步站立", "sent_at": "…", "schedule_offset_ms": 200,
 围栏的 `rule` / `scope` / `schedule` / `action` 都是**显示文本**（如「限速 0.3 m/s」「全部设备」「全天」「停止并告警」），
 `scope` 默认「全部设备」、`schedule` 默认「全天」。`polygon` 用地图坐标系（米，见「约定」）。
 
+**服务端执行**（按遥测 `pose` + `map_id`）：
+- `ban` 禁入区 / `wall` 虚拟墙：**进入时**停止设备，写设备事件，生成 warning 告警（`metric: geofence`，标题如「进入禁入区「配电室」」）。
+  之后仍可操控把设备开出来，离开时记一条事件。
+- `whitelist` 允许区：该地图上有适用的允许区、设备却不在任何一个里面时，同样停止并告警（「离开允许区…」）。
+- `slow` 限速区：在区内时运动指令的速度上限取 `rule` 里的第一个数字（m/s，缺省 0.3），与策略 `speed_limit` 取小。
+- 适用范围：`scope` 为空或含「全部」时所有设备，否则文本中出现设备的 id / 名称 / 编号才适用；
+  `schedule` 为「22:00–06:00」这类时段时只在该时段（排期时区，可跨零点）生效，其他文本视为一直生效。
+- 启用的围栏在机器人连接时和每次变化后以 `zones` 消息下发给机器人（见 §3）。
+
 安全策略 `policies`（字段名与前端 `SafetyPolicies` 一致）：
 
 ```json
@@ -635,6 +644,7 @@ robot → <binary> [ts i64 LE][N × (f32 x, f32 y) LE]   // 点云二维投影�
 server → webrtc_offer {session_id, sdp, streams[], ice_servers[]}  ◀▶  robot → webrtc_answer {session_id, sdp}
 server → webrtc_ice {session_id, candidate}                        ◀▶  robot → webrtc_ice {session_id, candidate}
 server → webrtc_close {session_id}                                 ◀▶  robot → webrtc_close {session_id, reason?}
+server → zones {zones: [{id, map_id, name, zone_type, polygon, speed_limit_mps}]}   // 连接时和围栏变化时；机器人端目前只保存
 ```
 
 急停指令 `{"kind":"estop","drill":true}` 是**演练**：机器人走一遍急停链路并回执，但不驱动硬件、不进入急停状态。

@@ -29,6 +29,7 @@ from .protocol import (
     WebrtcCloseUp,
     WebrtcOffer,
     Welcome,
+    ZonesMsg,
 )
 
 log = logging.getLogger(__name__)
@@ -168,6 +169,9 @@ class ServerLink:
         elif isinstance(msg, CommandMsg):
             # 不阻塞接收循环：SDK 调用可能耗时，急停必须能及时进来
             asyncio.ensure_future(self._execute(msg))
+        elif isinstance(msg, ZonesMsg):
+            self.controller.zones = msg.zones
+            log.info("收到电子围栏 %d 个", len(msg.zones))
         elif isinstance(msg, WebrtcOffer):
             # 视频推流尚未接入（需要 aiortc / GStreamer 推相机流）：明确拒绝，前端据此显示原因
             await self.send(WebrtcCloseUp(session_id=msg.session_id, reason="机器人端尚未接入视频"))

@@ -7,8 +7,9 @@ use crate::{
     config::Config,
     realtime::{Hub, TelemetrySample, webrtc::WebrtcSessions},
     services::{
-        alerting::AlertEngine, fleet_timeline::TimelinePlayer, leases::LeaseService,
-        missions::MissionRunner, safety::SafetyService, sessions::LoginLimiter,
+        alerting::AlertEngine, fleet_timeline::TimelinePlayer, geofence::Geofence,
+        leases::LeaseService, missions::MissionRunner, safety::SafetyService,
+        sessions::LoginLimiter,
     },
 };
 
@@ -24,6 +25,7 @@ pub struct AppState {
     pub missions: Arc<MissionRunner>,
     pub fleet_player: Arc<TimelinePlayer>,
     pub webrtc: Arc<WebrtcSessions>,
+    pub geofence: Arc<Geofence>,
     /// 对外 HTTP（告警 webhook、智能体服务）
     pub http: reqwest::Client,
     pub telemetry_tx: mpsc::Sender<TelemetrySample>,

@@ -253,6 +253,11 @@ pub enum ServerToRobot {
     WebrtcClose {
         session_id: String,
     },
+    /// 当前启用的电子围栏（连接时和围栏变化时下发）：
+    /// `[{id, map_id, name, zone_type: ban|slow|whitelist|wall, polygon: [[x, y]], speed_limit_mps}]`
+    Zones {
+        zones: Vec<Value>,
+    },
 }
 
 // ───────────────────────── 前端 ⇄ 服务器 ─────────────────────────

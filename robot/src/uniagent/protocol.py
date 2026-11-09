@@ -220,7 +220,15 @@ class WebrtcClose(BaseModel):
     session_id: str
 
 
+class ZonesMsg(BaseModel):
+    """当前启用的电子围栏（地图坐标系，米）。服务端已按遥测 pose 执行；机器人端先保存，供本地执行。"""
+
+    type: Literal["zones"]
+    zones: list[dict] = Field(default_factory=list)
+
+
 ServerMessage = Annotated[
-    Welcome | CommandMsg | Ping | WebrtcOffer | WebrtcIce | WebrtcClose, Field(discriminator="type")
+    Welcome | CommandMsg | Ping | WebrtcOffer | WebrtcIce | WebrtcClose | ZonesMsg,
+    Field(discriminator="type"),
 ]
 ServerMessageAdapter: TypeAdapter = TypeAdapter(ServerMessage)

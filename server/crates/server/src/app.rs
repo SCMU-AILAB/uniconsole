@@ -70,6 +70,7 @@ pub async fn build_state(cfg: Arc<Config>) -> anyhow::Result<AppState> {
         missions: Arc::new(MissionRunner::default()),
         fleet_player: Arc::default(),
         webrtc: Arc::default(),
+        geofence: Arc::new(crate::services::geofence::Geofence::load(&db).await?),
         telemetry_tx: spawn_telemetry_writer(db.clone()),
         login_limiter: Arc::new(LoginLimiter::default()),
         hub,

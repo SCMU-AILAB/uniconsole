@@ -128,7 +128,12 @@ async fn precheck(
                 return Err(AppError::EstopActive);
             }
             let p = st.safety.policies();
-            c.clamp(p.speed_limit, p.max_yaw_rate);
+            // 限速区：取策略与围栏上限中较小的
+            let speed = st
+                .geofence
+                .speed_cap(device_id)
+                .map_or(p.speed_limit, |cap| cap.min(p.speed_limit));
+            c.clamp(speed, p.max_yaw_rate);
         }
         _ => {}
     }

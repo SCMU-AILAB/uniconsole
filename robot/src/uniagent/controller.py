@@ -59,6 +59,8 @@ class Controller:
         self._moving = False
         self._last_move = 0.0
         self.lost_link_action = "stop"
+        # 服务器下发的电子围栏（服务端按遥测执行；这里保存供本地执行）
+        self.zones: list[dict] = []
 
     def apply_server_limits(self, max_speed: float, max_yaw: float) -> None:
         self.max_speed = min(self.settings.max_speed_mps, max_speed)

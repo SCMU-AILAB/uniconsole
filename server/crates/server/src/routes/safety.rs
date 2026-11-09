@@ -254,6 +254,7 @@ pub async fn create_zone(
         json!({ "map_id": z.map_id }),
     )
     .await;
+    st.geofence.changed(&st).await;
     zones_changed(&st, z.id);
     Ok((StatusCode::CREATED, Json(z)))
 }
@@ -295,6 +296,7 @@ pub async fn update_zone(
         json!({}),
     )
     .await;
+    st.geofence.changed(&st).await;
     zones_changed(&st, id);
     Ok(Json(z))
 }
@@ -320,6 +322,7 @@ pub async fn delete_zone(
         json!({}),
     )
     .await;
+    st.geofence.changed(&st).await;
     zones_changed(&st, id);
     Ok(StatusCode::NO_CONTENT)
 }

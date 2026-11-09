@@ -84,6 +84,7 @@ async fn handle(st: AppState, device_id: String, socket: WebSocket) {
     }
 
     set_online(&st, &device_id, true).await;
+    st.geofence.push_to_robot(&st, &device_id);
 
     // 写任务：下行指令 + 每秒一次应用层 ping（用于测量延迟）
     let mut writer = tokio::spawn(async move {
@@ -138,6 +139,7 @@ async fn handle(st: AppState, device_id: String, socket: WebSocket) {
     writer.abort();
     if st.hub.unregister_robot(&device_id, conn_id) {
         st.webrtc.robot_gone(&st, &device_id);
+        st.geofence.forget(&device_id);
         tracing::info!(device = %device_id, "机器人离线");
         set_online(&st, &device_id, false).await;
     }
@@ -190,6 +192,7 @@ async fn on_message(
             let latency = st.hub.live(device_id).latency_ms;
             st.hub.set_telemetry(device_id, t.clone());
             st.alerts.evaluate(st, device_id, &t, latency).await;
+            st.geofence.on_telemetry(st, device_id, &t).await;
             if last_persist.elapsed() >= persist_every {
                 *last_persist = Instant::now();
                 let _ = st.telemetry_tx.try_send(TelemetrySample {
