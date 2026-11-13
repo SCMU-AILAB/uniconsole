@@ -8,7 +8,7 @@ test -f "$robot_dir/.env" || { echo '请先配置 robot/.env'; exit 1; }
 test -x "$go2_dir/.venv/bin/python" || { echo '找不到 Go2Agent Python 环境'; exit 1; }
 cd "$robot_dir"
 "$uv_bin" venv --allow-existing --python "$go2_dir/.venv/bin/python"
-"$uv_bin" sync --frozen --no-dev
+"$uv_bin" sync --frozen --no-dev --extra video
 .venv/bin/python - "$go2_dir" <<'PY'
 from pathlib import Path
 import subprocess
@@ -23,6 +23,12 @@ site = subprocess.check_output(
 Path(sysconfig.get_path('purelib'), 'go2-local.pth').write_text(f'{site}\n{go2 / "src"}\n')
 PY
 .venv/bin/python -c 'import unitree_sdk2_cpp; from core.runtime import SkillRuntime; from robot import UnitreeGo2Adapter'
+.venv/bin/python - <<'PY'
+from uniagent.config import Settings
+if Settings.from_env().video_enabled:
+    import aiortc
+    from perception.go2_front import Go2FrontCamera
+PY
 chmod 600 .env
 mkdir -p "$HOME/.config/systemd/user"
 .venv/bin/python - "$robot_dir" <<'PY'

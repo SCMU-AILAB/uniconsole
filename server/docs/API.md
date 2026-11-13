@@ -695,5 +695,9 @@ offer 转发给机器人时附带同一份。
   `username = "<过期 Unix 时间>:<成员 id>"`，`credential = base64(HMAC-SHA1(TURN_SECRET, username))`，
   有效期 `TURN_TTL_SECS`（默认 12 小时）。前端在 `expires_at` 之前重新获取即可。
 
-机器人端（`robot/`）目前没有相机推流，收到 offer 会回 `webrtc_close`（「机器人端尚未接入视频」），
-也不会在 `capabilities` 里声明 `webrtc`。接入推流（aiortc / GStreamer）后声明 `webrtc` 即可。
+Go2 机器人端使用 Go2Agent `perception.go2_front` 采集前置相机，通过 aiortc 推流。
+安装 `video` 可选依赖并设置 `VIDEO_ENABLED=1` 后声明 `webrtc`，目前支持 `streams: ["front"]`，
+默认 640×360、10 帧/秒、最多两个观看会话。answer 的 SDP 包含已收集的 ICE candidate；
+客户端可发送 trickle ICE。客户端重试应使用新的 `session_id`，狗端会关闭重复使用的会话。
+缺失相机、失帧或协商失败通过 `webrtc_close.reason` 返回；视频不包含音频，也不需要控制权租约。
+当前实机验证为同网段媒体直连，跨网且无法直连时需实际部署并配置 TURN。

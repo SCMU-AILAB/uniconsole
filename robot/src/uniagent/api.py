@@ -11,6 +11,7 @@
 import asyncio
 import hmac
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -72,6 +73,7 @@ def create_app(settings: Settings | None = None, connect_server: bool = True) ->
     @app.get("/health")
     def health(c: Ctl):
         link: ServerLink = app.state.link
+        frame = c.backend.camera_frame()
         return {
             "ok": True,
             "device_id": settings.device_id,
@@ -80,6 +82,8 @@ def create_app(settings: Settings | None = None, connect_server: bool = True) ->
             "server_error": link.last_error,
             "estop": c.estop,
             "moving": c.moving,
+            "video_sessions": len(link.video.sessions) if link.video is not None else 0,
+            "camera_frame_age_ms": round((time.monotonic() - frame.stamp) * 1000) if frame else None,
         }
 
     @app.get("/info")

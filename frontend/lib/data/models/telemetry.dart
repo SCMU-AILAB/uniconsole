@@ -106,6 +106,7 @@ enum SourceHealth { ok, degraded, idle }
 @immutable
 class SensorSource {
   const SensorSource({
+    this.id,
     required this.name,
     required this.detail,
     required this.health,
@@ -113,6 +114,9 @@ class SensorSource {
   });
 
   final String name;
+
+  /// Robot-advertised stream id, e.g. `front`; labels are not capabilities.
+  final String? id;
 
   /// 「1280×720 · 30 fps」或话题名。
   final String detail;

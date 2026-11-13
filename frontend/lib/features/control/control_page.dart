@@ -14,6 +14,7 @@ import '../../data/providers.dart';
 import '../../data/repositories/repositories.dart';
 import '../devices/device_widgets.dart';
 import 'control_input.dart';
+import 'camera_player.dart';
 import 'mobile_control_page.dart';
 
 /// 摄像头（Control.dc.html CAMS）。
@@ -81,7 +82,9 @@ class ControlUi extends Notifier<ControlUiState> {
   void update(ControlUiState Function(ControlUiState) f) => state = f(state);
 
   void nextCamera() => state = state.copyWith(
-    camera: Camera.values[(state.camera.index + 1) % Camera.values.length],
+    camera: ref.read(liveRobotProvider) != null
+        ? Camera.front
+        : Camera.values[(state.camera.index + 1) % Camera.values.length],
   );
 }
 
@@ -551,15 +554,20 @@ class _Video extends ConsumerWidget {
 
     final live = ref.watch(liveRobotProvider) != null;
     return VideoPanel(
+      video: live ? CameraFeed(deviceId: d.id, online: gate.online) : null,
+      showCrosshair: !live,
       placeholder: !gate.online
           ? '[设备离线]'
           : live
-          ? '相机尚未接入'
+          ? ''
           : '[${ui.camera.label}视频流 · WebRTC]',
       topLeft: HudSegmented<Camera>(
         semanticLabel: '摄像头',
-        options: [for (final cam in Camera.values) (cam, cam.label)],
-        value: ui.camera,
+        options: [
+          for (final cam in live ? [Camera.front] : Camera.values)
+            (cam, cam.label),
+        ],
+        value: live ? Camera.front : ui.camera,
         onChanged: (cam) => ref
             .read(controlUiProvider(d.id).notifier)
             .update((s) => s.copyWith(camera: cam)),

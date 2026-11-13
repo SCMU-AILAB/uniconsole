@@ -14,7 +14,8 @@
 
 遥测角度在界面中换算为度，定位朝向仍保留弧度。电池、关节温度、足端力等缺失字段显示 `—`；
 Go2 未报告的实际姿态模式不使用最后下发的模式冒充。
-视频和点云尚未接入；实机页明确显示相机未接入，不显示演示视频帧率或视频延迟。
+前置相机已接入 WebRTC，狗端默认输出 640×360、10 帧/秒，只提供真实存在的 `front` 相机。
+点云尚未接入；电池和关节数据仍按缺失显示。
 其他业务页面（任务、联调、告警编辑、运维、智能体等）的仓库仍为演示实现，不属于本次实机控制验证。
 
 ## 验证
@@ -22,6 +23,13 @@ Go2 未报告的实际姿态模式不使用最后下发的模式冒充。
 已通过前端仓库到真机的完整流程：读取在线设备、实时遥测、申请/续约控制权、Stop 回执、单机急停演练回执、
 读取指令日志、释放控制权。此次未执行真实走动、起身或舞蹈；SDK 接受命令不代表动作物理完成。
 公网转发链路出现过心跳超时，狗端现使用同网段直连；网络丢包仍会触发停止和重连。
+
+相机链路已通过真实后端的鉴权信令协商，收到连续 30 帧现场画面，帧时间戳递增。
+macOS 原生 Flutter 集成测试也已收到并显示视频帧，验证纯视频接收（无音频请求），
+保存接收画面并退出页面；狗端观看会话数恢复为 0。
+测试不获取控制权，不发送运动指令。相机采集复用 Go2Agent 的 DDS，编解码不占用控制接收循环。
+媒体在客户端与狗端之间直连；本次在同一局域网验证。外网不能直连时需配置 TURN，
+仅能访问公网后端 HTTP 地址并不保证视频 UDP 可达。
 
 可重复验证（仅使用空闲设备；不会发送运动指令）：
 
@@ -34,6 +42,19 @@ flutter test --no-pub test/e2e/live_robot_e2e_test.dart
 会话文件与 TokenStore 格式一致，包含 `server`、`token`、`session_id`、`expires_at`、`member`，权限设为 `600`，不提交。
 若终端配置了 HTTP 代理，请确保后端地址不经不支持 WebSocket 的代理；测试进程的 macOS 局域网权限与应用本身独立。
 开发环境使用 `/opt/homebrew/share/flutter/bin/flutter`（Flutter 3.47.9 / Dart 3.13.7）。
+
+原生视频测试（不申请控制权、不发机器人指令）：
+
+```bash
+PATH=/opt/homebrew/share/flutter/bin:$PATH tool/run_macos.sh test \
+  integration_test/camera_playback_test.dart \
+  --dart-define=E2E_SESSION_FILE=/应用可读取的安全路径/session.json \
+  --dart-define=E2E_DEVICE=go2-cf-01
+```
+
+macOS 沙盒下，会话文件可放在 `~/Library/Containers/com.ailab.uniconsole/Data/tmp/`，
+权限设为 `600`；验证结束删除并注销测试会话。可选 `E2E_CAMERA_CAPTURE` 指定接收画面的保存路径。
+运行测试后，使用 `tool/run_macos.sh build --debug` 恢复正常应用入口。
 
 狗端运维：
 

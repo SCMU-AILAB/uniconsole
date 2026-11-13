@@ -13,6 +13,7 @@ import '../../data/models/models.dart';
 import '../../data/providers.dart';
 import 'control_input.dart';
 import 'control_page.dart';
+import 'camera_player.dart';
 
 /// 移动端横屏操控（MobileControl.dc.html，844 × 390）。
 ///
@@ -94,6 +95,8 @@ class _Landscape extends ConsumerWidget {
     final t = context.type;
     final d = device;
     final ui = ref.watch(controlUiProvider(d.id));
+    final live = ref.watch(liveRobotProvider) != null;
+    final cameras = live ? [Camera.front] : _cams;
     final input = ref.watch(controlInputProvider(d.id));
     final notifier = ref.read(controlInputProvider(d.id).notifier);
     final tm = gate.online ? ref.watch(telemetryProvider(d.id)).value : null;
@@ -160,31 +163,31 @@ class _Landscape extends ConsumerWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: CustomPaint(
-            painter: _PerspectiveGrid(c.hudText.withValues(alpha: 0.08)),
-          ),
+          child: live
+              ? CameraFeed(deviceId: d.id, online: gate.online)
+              : CustomPaint(
+                  painter: _PerspectiveGrid(c.hudText.withValues(alpha: 0.08)),
+                ),
         ),
-        Align(
-          alignment: const Alignment(0, -0.08),
-          child: Text(
-            !gate.online
-                ? '[设备离线]'
-                : ref.watch(liveRobotProvider) != null
-                ? '相机尚未接入'
-                : '[${ui.camera.short}实时画面]',
-            style: t.subhead.copyWith(color: c.decorativeGray),
-          ),
-        ),
-        Center(
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: c.hudText.withValues(alpha: 0.5)),
+        if (!live)
+          Align(
+            alignment: const Alignment(0, -0.08),
+            child: Text(
+              !gate.online ? '[设备离线]' : '[${ui.camera.short}实时画面]',
+              style: t.subhead.copyWith(color: c.decorativeGray),
             ),
           ),
-        ),
+        if (!live)
+          Center(
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: c.hudText.withValues(alpha: 0.5)),
+              ),
+            ),
+          ),
         // 左上：返回 + 设备信息
         Positioned(
           left: side,
@@ -249,8 +252,8 @@ class _Landscape extends ConsumerWidget {
           child: Center(
             child: HudSegmented<Camera>(
               semanticLabel: '摄像头',
-              options: [for (final cam in _cams) (cam, cam.short)],
-              value: _cams.contains(ui.camera) ? ui.camera : Camera.front,
+              options: [for (final cam in cameras) (cam, cam.short)],
+              value: cameras.contains(ui.camera) ? ui.camera : Camera.front,
               onChanged: (cam) => ref
                   .read(controlUiProvider(d.id).notifier)
                   .update((s) => s.copyWith(camera: cam)),

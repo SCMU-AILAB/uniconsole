@@ -24,6 +24,15 @@ class VelocityLimits:
     yaw_rad_s: float = 2.0
 
 
+@dataclass(frozen=True)
+class CameraFrame:
+    """最新相机帧；stamp 使用 monotonic 秒，消费者必须拒绝过期帧。"""
+
+    seq: int
+    stamp: float
+    jpeg: bytes
+
+
 class RobotBackend(ABC):
     capabilities: ClassVar[tuple[str, ...]] = ()
     limits: VelocityLimits = VelocityLimits()
@@ -72,6 +81,10 @@ class RobotBackend(ABC):
 
     async def pointcloud(self) -> list[tuple[float, float]] | None:
         """当前点云的二维投影（米，机器人坐标系 +y 朝前、+x 朝右）；不支持返回 None。"""
+        return None
+
+    def camera_frame(self, stream: str = "front") -> CameraFrame | None:
+        """非阻塞读取 Go2Agent 已采集的最新 JPEG；不在控制事件循环采集。"""
         return None
 
     @abstractmethod

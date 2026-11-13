@@ -55,6 +55,10 @@ class Settings:
     local_api_token: str = ""  # 为空则本地控制接口禁用
 
     telemetry_hz: int = 10
+    video_enabled: bool = False
+    video_fps: int = 10
+    video_width: int = 640
+    video_max_sessions: int = 2
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -80,4 +84,8 @@ class Settings:
             api_port=int(_env("API_PORT", d.api_port)),
             local_api_token=_env("LOCAL_API_TOKEN"),
             telemetry_hz=int(_env("TELEMETRY_HZ", d.telemetry_hz)),
+            video_enabled=_flag("VIDEO_ENABLED"),
+            video_fps=max(1, min(30, int(_env("VIDEO_FPS", d.video_fps)))),
+            video_width=max(160, min(1280, int(_env("VIDEO_WIDTH", d.video_width)))),
+            video_max_sessions=max(1, min(4, int(_env("VIDEO_MAX_SESSIONS", d.video_max_sessions)))),
         )

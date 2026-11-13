@@ -79,9 +79,36 @@ ADAPTER=go2agent NETWORK_INTERFACE=eth0 uv run uniagent
 
 2026-11-13 真机联调：ARM64 狗端、eth0 DDS、设备 `go2-cf-01`，验证真实姿态/位置上传、
 StopMove 回执和急停演练回执。回执表示 SDK 接受命令，走动/起身未在本次联调中执行。
-相机、点云、低层电池/关节数据仍需通过 Go2Agent 提供。
+前置相机现已接入 WebRTC；点云、低层电池/关节数据仍需通过 Go2Agent 提供。
 
 本次部署的后端与狗端同网段：狗端 `192.168.31.74`，后端 `192.168.31.144:8800`。
 代理使用 `ws://192.168.31.144:8800/api/v1/robot/ws`，避免经过公网 FRP 转发。
 现场网络仍可能丢包，触发停止与重连。`extra.unavailable` 标明没有数据的字段；实际模式未知时 `mode=null`。
 前端联调步骤与验证范围见 [GO2_LIVE.md](../frontend/docs/GO2_LIVE.md)。
+
+## 前置相机
+
+采集复用 Go2Agent 的 `perception.go2_front.Go2FrontCamera`，其工作线程只使用已有 DDS 连接，
+不会初始化或释放 DDS，也不会执行动作。旧版 Go2Agent 需要包含 `a080029` 提交
+（`feat/uniconsole-front-camera` 分支）；本次狗端已补入该模块，保留原有其他修改。
+
+```bash
+uv sync --extra video
+# 在 .env 设置（部署脚本已安装 video 可选依赖）：
+# VIDEO_ENABLED=1
+# VIDEO_FPS=10
+# VIDEO_WIDTH=640
+# VIDEO_MAX_SESSIONS=2
+systemctl --user restart uniagent
+```
+
+`front` 是目前唯一真实相机流。默认输出 640 像素宽、10 帧/秒，最多两位观看者共享采集和解码。
+JPEG 解码和视频编码在工作线程执行；发送端丢弃积压帧，控制心跳与 Stop 不等待视频协商。
+相机 5 秒没有新帧会关闭视频并返回原因，信令断开会关闭所有媒体连接。普通关页也会释放该观看会话。
+`/health` 的 `video_sessions` 和 `camera_frame_age_ms` 用于检查观看会话与采集新鲜度。
+
+WebRTC 信令沿用后端鉴权，媒体直接连接狗端；跨网段且无法直连时，需要在后端配置可达的 TURN
+（`TURN_URLS` / `TURN_SECRET`），仅转发 HTTP/WebSocket 的 FRP 不会转发视频 UDP。
+当前验证在同一局域网完成，经过公网后端信令收到连续真实视频帧。
+
+视频回归测试：`uv run --extra video pytest`。本地测试用生成图像和假相机，不连接真实 DDS。

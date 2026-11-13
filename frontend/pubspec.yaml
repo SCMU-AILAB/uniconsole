@@ -39,6 +39,7 @@ dependencies:
   go_router: ^18.1.2
   http: ^1.6.0
   flutter_secure_storage: ^11.2.0
+  flutter_webrtc: ^1.6.3
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import '../models/models.dart';
+import '../repositories/camera_signaling.dart';
 import '../repositories/repositories.dart';
 import 'api_client.dart';
 
@@ -96,7 +97,8 @@ class LiveRobotRepository
         TelemetryRepository,
         ControlRepository,
         LeaseRepository,
-        SensorRepository {
+        SensorRepository,
+        CameraSignaling {
   LiveRobotRepository(this.api) {
     unawaited(_connect());
   }
@@ -111,8 +113,69 @@ class LiveRobotRepository
   Timer? _retry;
   bool _disposed = false;
   String? connectionError;
-  bool get connected => _socket?.readyState == WebSocket.open;
+  @override
+  bool get connected => !_disposed && _socket?.readyState == WebSocket.open;
 
+  @override
+  Future<List<Map<String, dynamic>>> cameraIceServers() async =>
+      jsonRows(await api.get('/webrtc/ice-servers'));
+
+  @override
+  Stream<Map<String, dynamic>> cameraSignals(
+    String deviceId,
+    String sessionId,
+  ) => _events.stream.where((e) {
+    // Older servers return unscoped errors. Surface them, retaining the
+    // existing disconnect/stop protection for these ambiguous failures.
+    if (e['type'] == 'error' && e['session_id'] == null) return true;
+    return e['device_id'] == deviceId &&
+        e['session_id'] == sessionId &&
+        const {
+          'webrtc_answer',
+          'webrtc_ice',
+          'webrtc_close',
+          'error',
+        }.contains(e['type']);
+  });
+
+  void _cameraSend(Map<String, dynamic> message) {
+    if (!connected) throw StateError('实时连接已断开');
+    _socket!.add(jsonEncode(message));
+  }
+
+  @override
+  void cameraOffer(String deviceId, String sessionId, String sdp) =>
+      _cameraSend({
+        'type': 'webrtc_offer',
+        'device_id': deviceId,
+        'session_id': sessionId,
+        'sdp': sdp,
+        'streams': ['front'],
+      });
+
+  @override
+  void cameraIce(
+    String deviceId,
+    String sessionId,
+    Map<String, dynamic> candidate,
+  ) => _cameraSend({
+    'type': 'webrtc_ice',
+    'device_id': deviceId,
+    'session_id': sessionId,
+    'candidate': candidate,
+  });
+
+  @override
+  void cameraClose(String deviceId, String sessionId) {
+    if (!connected) return;
+    _cameraSend({
+      'type': 'webrtc_close',
+      'device_id': deviceId,
+      'session_id': sessionId,
+    });
+  }
+
+  @override
   Stream<bool> watchConnection() async* {
     yield connected;
     yield* _connection.stream;
@@ -413,9 +476,15 @@ class LiveRobotRepository
     List<SensorSource> sources(Object? list) => [
       for (final s in jsonRows(list ?? []))
         SensorSource(
+          id: s['id'] as String?,
           name: s['name'] ?? s['id'] ?? '',
           detail: s['detail'] ?? '',
-          health: SourceHealth.idle,
+          health: s['health'] == 'warn'
+              ? SourceHealth.degraded
+              : SourceHealth.values
+                        .where((h) => h.name == s['health'])
+                        .firstOrNull ??
+                    SourceHealth.idle,
           hz: (s['hz'] as num?)?.toDouble(),
         ),
     ];
@@ -426,15 +495,18 @@ class LiveRobotRepository
     );
   });
   void dispose() {
+    if (_disposed) return;
+    final wasConnected = connected;
     _disposed = true;
     _retry?.cancel();
     _connectingClient?.close(force: true);
-    if (connected) {
+    if (wasConnected) {
       for (final id in _driving) {
         _socket!.add(jsonEncode({'type': 'stop', 'device_id': id}));
       }
     }
     unawaited(_socket?.close());
+    _connection.add(false);
     unawaited(_events.close());
     unawaited(_connection.close());
   }

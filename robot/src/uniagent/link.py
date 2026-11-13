@@ -26,7 +26,9 @@ from .protocol import (
     ServerMessageAdapter,
     StateMsg,
     TelemetryMsg,
+    WebrtcClose,
     WebrtcCloseUp,
+    WebrtcIce,
     WebrtcOffer,
     Welcome,
     ZonesMsg,
@@ -45,6 +47,14 @@ class ServerLink:
         self._send_lock = asyncio.Lock()
         self._telemetry_hz = self.settings.telemetry_hz
         self._commands: set[asyncio.Task] = set()
+        self.video = None
+        if self.settings.video_enabled:
+            try:
+                from .video import VideoSessions
+
+                self.video = VideoSessions(controller.backend, self.settings, self.send)
+            except ImportError:
+                log.error("未安装视频依赖：uv sync --extra video")
 
     async def send(self, msg: BaseModel) -> None:
         ws = self._ws
@@ -103,7 +113,7 @@ class ServerLink:
         backend = self.controller.backend
         await self.send(
             Hello(
-                capabilities=list(backend.capabilities),
+                capabilities=[c for c in backend.capabilities if c != "webrtc" or self.video is not None],
                 skills=backend.skills(),
                 sensors=backend.sensors(),
                 **backend.info(),
@@ -139,7 +149,11 @@ class ServerLink:
             await asyncio.gather(*pending, return_exceptions=True)
             self._commands.clear()
             # 在 WebSocket close 握手之前停止，不能让网络超时延迟硬件停止。
-            await self.controller.on_link_lost()
+            try:
+                await self.controller.on_link_lost()
+            finally:
+                if self.video is not None:
+                    await self.video.close_all()
 
     async def _pointcloud_loop(self, hz: float = 5.0) -> None:
         """点云二进制帧：[ts i64 LE][N × (f32 x, f32 y) LE]，后端不支持时直接退出。"""
@@ -184,9 +198,15 @@ class ServerLink:
             self.controller.zones = msg.zones
             log.info("收到电子围栏 %d 个", len(msg.zones))
         elif isinstance(msg, WebrtcOffer):
-            # 视频推流尚未接入（需要 aiortc / GStreamer 推相机流）：明确拒绝，前端据此显示原因
-            await self.send(WebrtcCloseUp(session_id=msg.session_id, reason="机器人端尚未接入视频"))
-        # webrtc_ice / webrtc_close：没有进行中的视频会话，忽略
+            if self.video is not None:
+                await self.video.offer(msg)
+            else:
+                await self.send(WebrtcCloseUp(session_id=msg.session_id, reason="机器人端相机未启用"))
+        elif isinstance(msg, WebrtcIce) and self.video is not None:
+            self.video.ice(msg)
+        elif isinstance(msg, WebrtcClose) and self.video is not None:
+            # close 可能等待媒体线程；不得阻塞心跳与 Stop 接收。
+            self.video.request_close(msg.session_id)
 
     async def _execute(self, msg: CommandMsg) -> None:
         cmd = msg.command

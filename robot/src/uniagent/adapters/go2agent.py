@@ -10,12 +10,14 @@ Go2Agent 约定「Robot Skill Runtime 是唯一动作执行边界」，因此：
 UnitreeGo2Adapter 是进程内唯一的 DDS 所有者；不要同时运行 Go2Agent 自己的 app.api / app.main。
 """
 
+import asyncio
 import logging
 import math
+import time
 from typing import Any
 
 from ..protocol import Pose, Telemetry
-from .base import AdapterError, RobotBackend, VelocityLimits
+from .base import AdapterError, CameraFrame, RobotBackend, VelocityLimits
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +52,8 @@ class Go2AgentBackend(RobotBackend):
         model: str = "Unitree Go2 EDU",
         limits: VelocityLimits = GO2AGENT_DEFAULT_LIMITS,
         simulated: bool = False,
+        video_enabled: bool = False,
+        video_fps: int = 10,
     ) -> None:
         try:
             from core.runtime import SkillRuntime
@@ -60,6 +64,9 @@ class Go2AgentBackend(RobotBackend):
 
         self._model = model
         self._simulated = simulated
+        self._video_enabled = video_enabled and not simulated
+        self._video_fps = video_fps
+        self._camera = None
         self.limits = limits
         if simulated:
             self.robot = SimulatedRobotAdapter()
@@ -82,10 +89,49 @@ class Go2AgentBackend(RobotBackend):
     async def connect(self) -> None:
         if not self._simulated:
             await self._native(self.robot.connect())
+        if self._video_enabled:
+            try:
+                from perception.go2_front import Go2FrontCamera
+
+                # 采集实现归 Go2Agent，复用上面已初始化的 DDS，永不另起 DDS 所有者。
+                camera = Go2FrontCamera(fps=self._video_fps)
+                await asyncio.to_thread(camera.start)
+                self._camera = camera
+                self.capabilities = (*type(self).capabilities, "webrtc")
+            except Exception:
+                log.exception("Go2Agent 前置相机初始化失败，控制与遥测仍可使用")
 
     async def close(self) -> None:
+        if self._camera is not None:
+            await asyncio.to_thread(self._camera.close)
+            if self._camera.status.state == "close_timeout":
+                raise AdapterError("相机线程尚未停止，保留 DDS 至进程退出")
+            self._camera = None
         if not self._simulated:
             await self._native(self.robot.close())
+
+    def camera_frame(self, stream: str = "front") -> CameraFrame | None:
+        if stream != "front" or self._camera is None:
+            return None
+        frame = self._camera.latest()
+        return None if frame is None else CameraFrame(frame.seq, frame.stamp, frame.jpeg)
+
+    def sensors(self) -> dict[str, Any] | None:
+        if self._camera is None:
+            return None
+        frame = self.camera_frame()
+        healthy = frame is not None and time.monotonic() - frame.stamp < 2
+        return {
+            "cameras": [
+                {
+                    "name": "front",
+                    "detail": "Go2 前置相机",
+                    "health": "ok" if healthy else "idle",
+                    "hz": self._video_fps,
+                }
+            ],
+            "topics": [],
+        }
 
     def info(self) -> dict[str, Any]:
         # TODO：从固件接口读取真实 SN / 固件版本

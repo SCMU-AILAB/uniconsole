@@ -9,6 +9,7 @@
 #   tool/run_macos.sh                 # flutter run -d macos
 #   tool/run_macos.sh run [参数...]    # 同上，附加参数
 #   tool/run_macos.sh build [参数...]  # flutter build macos（默认 --debug）
+#   tool/run_macos.sh test [参数...]   # flutter test -d macos（原生集成测试）
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -24,12 +25,13 @@ cmd="${1:-run}"
 
 case "$cmd" in
   run) exec flutter run -d macos "$@" ;;
+  test) exec flutter test -d macos "$@" ;;
   build)
     if [[ $# -eq 0 ]]; then set -- --debug; fi
     exec flutter build macos "$@"
     ;;
   *)
-    echo "用法: tool/run_macos.sh [run|build] [flutter 参数...]" >&2
+    echo "用法: tool/run_macos.sh [run|build|test] [flutter 参数...]" >&2
     exit 64
     ;;
 esac

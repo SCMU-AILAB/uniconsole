@@ -16,6 +16,8 @@ def create_backend(settings: Settings) -> RobotBackend:
             model=settings.model,
             limits=VelocityLimits(settings.go2_max_forward, settings.go2_max_lateral, settings.go2_max_yaw),
             simulated=settings.go2agent_simulated,
+            video_enabled=settings.video_enabled,
+            video_fps=settings.video_fps,
         )
     raise ValueError(f"未知后端 {settings.adapter}（可选：mock、go2agent）")
 
