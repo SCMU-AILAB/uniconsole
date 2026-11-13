@@ -81,7 +81,7 @@ void main() {
       expect(world.leases.lease('go2-01'), isNull);
     });
 
-    test('同步指令：每台设备一条回执；急停的设备拒绝运动指令，趴下仍可执行', () async {
+    test('同步指令：每台设备一条回执；急停的设备拒绝运动指令，趴下同样被拒绝', () async {
       var r = await world.sessions.send(
         's12',
         const SetModeCommand(MotionMode.stand),
@@ -101,7 +101,7 @@ void main() {
         const SetModeCommand(MotionMode.down),
         label: '全体趴下',
       );
-      expect(r.acks.every((a) => a.ok), isTrue);
+      expect(r.acks.last.error, CommandError.estopActive);
       expect(world.sessions.session('s12')!.lastReceipt!.label, '全体趴下');
     });
 

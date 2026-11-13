@@ -86,9 +86,9 @@ class SetModeCommand extends DeviceCommand {
   @override
   String get logText => 'sport.SwitchGait(${mode.name})';
 
-  /// 趴下 / 阻尼属于让设备停下来的安全动作，急停中也允许。
+  /// 阻尼属于停止类指令；趴下仍需控制权且会被急停拒绝。
   @override
-  bool get isMotion => mode != MotionMode.down && mode != MotionMode.damp;
+  bool get isMotion => mode != MotionMode.damp;
 }
 
 class SetSpeedCommand extends DeviceCommand {
@@ -101,9 +101,6 @@ class SetSpeedCommand extends DeviceCommand {
 
   @override
   String get logText => 'sport.SpeedLevel(${level.name}, ${level.mps} m/s)';
-
-  @override
-  bool get isMotion => false;
 }
 
 class ActionCommand extends DeviceCommand {
@@ -137,7 +134,8 @@ enum CommandError {
   forbidden('没有该设备的控制权（只读）'),
   estopActive('急停中，运动指令被拒绝'),
   robotOffline('设备不在线'),
-  timeout('等待设备回执超时');
+  timeout('等待设备回执超时'),
+  rejected('设备拒绝指令，详情见指令日志');
 
   const CommandError(this.message);
 

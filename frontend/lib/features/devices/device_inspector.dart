@@ -240,7 +240,11 @@ class _People extends ConsumerWidget {
                   color: c.secondaryLabel,
                 ),
         ),
-        GroupedListRow(title: '授权使用者', value: '3 人', onTap: () {}),
+        GroupedListRow(
+          title: '授权使用者',
+          value:
+              '${ref.watch(membersProvider).value?.where((m) => m.grantedDeviceIds.contains(device.id)).length ?? 0} 人',
+        ),
       ],
     );
   }

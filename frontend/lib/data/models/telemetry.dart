@@ -25,6 +25,7 @@ class Telemetry {
     this.mode,
     this.accel = const [0, 0, 9.8],
     this.locConfidence,
+    this.unavailable = const {},
   });
 
   final String deviceId;
@@ -65,8 +66,20 @@ class Telemetry {
   /// 定位置信度 0–1（API `extra.loc_confidence`）。
   final double? locConfidence;
 
-  double get maxJointTemp =>
-      jointTemps.expand((l) => l).reduce((a, b) => a > b ? a : b);
+  /// 机器人明确报告未接入的字段。
+  final Set<String> unavailable;
+
+  double? get maxJointTemp {
+    final values = jointTemps.expand((l) => l);
+    return values.isEmpty ? null : values.reduce((a, b) => a > b ? a : b);
+  }
+
+  double? jointTemp(int leg, int joint) =>
+      leg < jointTemps.length && joint < jointTemps[leg].length
+      ? jointTemps[leg][joint]
+      : null;
+  double? footForce(int leg) =>
+      leg < footForces.length ? footForces[leg] : null;
 }
 
 @immutable

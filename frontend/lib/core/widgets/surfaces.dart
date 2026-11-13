@@ -205,7 +205,15 @@ class MetricCell extends StatelessWidget {
             style: context.type.caption.copyWith(color: c.secondaryLabel),
           ),
           const SizedBox(height: AppSpacing.half),
-          Text(value, style: context.type.metric.copyWith(color: c.label)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: context.type.metric.copyWith(color: c.label),
+            ),
+          ),
         ],
       ),
     );

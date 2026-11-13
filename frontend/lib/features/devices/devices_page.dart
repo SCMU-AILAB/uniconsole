@@ -135,7 +135,8 @@ class _DevicesPageState extends ConsumerState<DevicesPage> {
       case DeviceSort.name:
         return list..sort((a, b) => a.name.compareTo(b.name));
       case DeviceSort.battery:
-        return list..sort((a, b) => b.battery.compareTo(a.battery));
+        return list
+          ..sort((a, b) => (b.battery ?? -1).compareTo(a.battery ?? -1));
     }
   }
 
@@ -439,7 +440,7 @@ class _DeviceTable extends StatelessWidget {
                   children: [
                     Expanded(
                       child: ProgressBar(
-                        value: d.status.isOnline ? d.battery / 100 : 0,
+                        value: d.status.isOnline ? (d.battery ?? 0) / 100 : 0,
                         semanticLabel: '电量',
                       ),
                     ),
@@ -447,7 +448,9 @@ class _DeviceTable extends StatelessWidget {
                     SizedBox(
                       width: 32,
                       child: Text(
-                        d.status.isOnline ? '${d.battery}%' : '—',
+                        d.status.isOnline && d.battery != null
+                            ? '${d.battery}%'
+                            : '—',
                         style: t.footnote.copyWith(color: c.tertiaryLabel),
                       ),
                     ),
@@ -556,7 +559,9 @@ class _MobileList extends ConsumerWidget {
                 ),
                 subtitle: d.currentTask,
                 detail: '管理 $owner · 使用 $user',
-                value: d.status.isOnline ? '${d.battery}%' : '—',
+                value: d.status.isOnline && d.battery != null
+                    ? '${d.battery}%'
+                    : '—',
                 onTap: () =>
                     context.push(Routes.device(d.id), extra: NavIntent.push),
               );

@@ -57,13 +57,13 @@ void main() {
       await close(tester);
     });
 
-    testWidgets('空格 = 全体急停：运动指令禁用，只能趴下；再按解除', (tester) async {
+    testWidgets('空格 = 全体急停：运动指令禁用；再按解除', (tester) async {
       final container = await open(tester, location: Routes.fleet('s12'));
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await settle(tester);
       expect(container.read(estopProvider('g1-01')).value, isTrue);
       expect(container.read(estopProvider('go2-04')).value, isTrue);
-      expect(find.text('2 台设备急停中 · 运动指令已禁用，只能趴下'), findsOneWidget);
+      expect(find.text('2 台设备急停中 · 运动指令已禁用'), findsOneWidget);
       PrimaryButton stand() => tester.widget<PrimaryButton>(
         find.widgetWithText(PrimaryButton, '全体站立'),
       );
@@ -74,7 +74,7 @@ void main() {
               find.widgetWithText(SecondaryButton, '全体趴下'),
             )
             .onPressed,
-        isNotNull,
+        isNull,
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await settle(tester);

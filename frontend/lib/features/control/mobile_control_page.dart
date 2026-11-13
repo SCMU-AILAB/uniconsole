@@ -167,7 +167,11 @@ class _Landscape extends ConsumerWidget {
         Align(
           alignment: const Alignment(0, -0.08),
           child: Text(
-            gate.online ? '[${ui.camera.short}实时画面]' : '[设备离线]',
+            !gate.online
+                ? '[设备离线]'
+                : ref.watch(liveRobotProvider) != null
+                ? '相机尚未接入'
+                : '[${ui.camera.short}实时画面]',
             style: t.subhead.copyWith(color: c.decorativeGray),
           ),
         ),
@@ -339,9 +343,7 @@ class _Landscape extends ConsumerWidget {
                 chip(
                   m.label,
                   mode == m,
-                  gate.online &&
-                          gate.holds &&
-                          (!gate.estop || m == MotionMode.down)
+                  gate.online && gate.holds && !gate.estop
                       ? () => actions.setMode(m)
                       : null,
                   width: 72,
@@ -379,7 +381,12 @@ class _Landscape extends ConsumerWidget {
                     for (final (k, v) in [
                       ('vx', tm == null ? '—' : signed(tm.vx)),
                       ('vy', tm == null ? '—' : signed(tm.vy)),
-                      ('ωz', tm == null ? '—' : signed(tm.wz)),
+                      (
+                        'ωz',
+                        tm == null || tm.unavailable.contains('wz')
+                            ? '—'
+                            : signed(tm.wz),
+                      ),
                     ]) ...[
                       Text('$k '),
                       Text(

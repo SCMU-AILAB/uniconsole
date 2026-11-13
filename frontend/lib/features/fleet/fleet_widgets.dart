@@ -200,7 +200,7 @@ class _ParticipantRow extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.half),
                     Text(
-                      '${d.model.replaceFirst('Unitree ', '')} · 电量 ${d.battery}%',
+                      '${d.model.replaceFirst('Unitree ', '')} · 电量 ${d.battery ?? '—'}%',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: t.footnote.copyWith(color: c.secondaryLabel),
@@ -764,6 +764,7 @@ String _ackError(CommandError? e) => switch (e) {
   CommandError.forbidden => '无控制权',
   CommandError.robotOffline => '离线',
   CommandError.timeout => '回执超时',
+  CommandError.rejected => '设备拒绝',
   null => '失败',
 };
 

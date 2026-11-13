@@ -2,6 +2,10 @@ import 'dart:collection';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'api/live_auth_repository.dart';
+import 'api/live_member_repository.dart';
+import 'api/live_robot_repository.dart';
+import 'api/live_safety_repository.dart';
 import 'mock/mock_repositories.dart';
 import 'models/models.dart';
 import 'repositories/repositories.dart';
@@ -16,7 +20,7 @@ final mockWorldProvider = Provider<MockWorld>((ref) {
 });
 
 final deviceRepositoryProvider = Provider<DeviceRepository>(
-  (ref) => ref.watch(mockWorldProvider).devices,
+  (ref) => ref.watch(liveRobotProvider) ?? ref.watch(mockWorldProvider).devices,
 );
 final alertRepositoryProvider = Provider<AlertRepository>(
   (ref) => ref.watch(mockWorldProvider).alerts,
@@ -25,7 +29,7 @@ final fleetRepositoryProvider = Provider<FleetRepository>(
   (ref) => ref.watch(mockWorldProvider).sessions,
 );
 final leaseRepositoryProvider = Provider<LeaseRepository>(
-  (ref) => ref.watch(mockWorldProvider).leases,
+  (ref) => ref.watch(liveRobotProvider) ?? ref.watch(mockWorldProvider).leases,
 );
 
 /// 登录与会话。应用启动时 override 为 [LiveAuthRepository]（真实后端）；
@@ -33,21 +37,27 @@ final leaseRepositoryProvider = Provider<LeaseRepository>(
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => ref.watch(mockWorldProvider).auth,
 );
-final memberRepositoryProvider = Provider<MemberRepository>(
-  (ref) => ref.watch(mockWorldProvider).members,
-);
+final memberRepositoryProvider = Provider<MemberRepository>((ref) {
+  final live = ref.watch(liveRobotProvider);
+  return live == null
+      ? ref.watch(mockWorldProvider).members
+      : LiveMemberRepository(live);
+});
 final telemetryRepositoryProvider = Provider<TelemetryRepository>(
-  (ref) => ref.watch(mockWorldProvider).fleet,
+  (ref) => ref.watch(liveRobotProvider) ?? ref.watch(mockWorldProvider).fleet,
 );
 final controlRepositoryProvider = Provider<ControlRepository>(
-  (ref) => ref.watch(mockWorldProvider).fleet,
+  (ref) => ref.watch(liveRobotProvider) ?? ref.watch(mockWorldProvider).fleet,
 );
 final sensorRepositoryProvider = Provider<SensorRepository>(
-  (ref) => ref.watch(mockWorldProvider).fleet,
+  (ref) => ref.watch(liveRobotProvider) ?? ref.watch(mockWorldProvider).fleet,
 );
-final safetyRepositoryProvider = Provider<SafetyRepository>(
-  (ref) => ref.watch(mockWorldProvider).safety,
-);
+final safetyRepositoryProvider = Provider<SafetyRepository>((ref) {
+  final live = ref.watch(liveRobotProvider);
+  return live == null
+      ? ref.watch(mockWorldProvider).safety
+      : LiveSafetyRepository(live);
+});
 final missionRepositoryProvider = Provider<MissionRepository>(
   (ref) => ref.watch(mockWorldProvider).missions,
 );
@@ -66,6 +76,22 @@ final intercomRepositoryProvider = Provider<IntercomRepository>(
 final preferencesRepositoryProvider = Provider<PreferencesRepository>(
   (ref) => ref.watch(mockWorldProvider).preferences,
 );
+
+/// 真实登录会话的设备链路；切换账号时关闭旧连接。
+final liveRobotProvider = Provider<LiveRobotRepository?>((ref) {
+  final auth = ref.watch(authRepositoryProvider);
+  ref.watch(
+    authSessionProvider.select((s) => (s.value ?? auth.session)?.token),
+  );
+  if (auth is! LiveAuthRepository || auth.api == null) return null;
+  final repo = LiveRobotRepository(auth.api!);
+  ref.onDispose(repo.dispose);
+  return repo;
+});
+final controlConnectionProvider = StreamProvider<bool>((ref) {
+  final live = ref.watch(liveRobotProvider);
+  return live?.watchConnection() ?? Stream.value(true);
+});
 
 // ---- 数据流 ----
 
@@ -462,6 +488,24 @@ class FleetSummary {
   int get offline => total - online;
 }
 
+// 总览徽标也读取服务器，避免把演示联调会话和告警带入实机页面。
+final liveSummaryCountsProvider = StreamProvider<(int, int, int)>((ref) {
+  final live = ref.watch(liveRobotProvider);
+  if (live == null) return const Stream.empty();
+  return live.poll(() async {
+    final results = await Future.wait([
+      live.api.get('/alerts'),
+      live.api.get('/fleet-sessions'),
+    ]);
+    final alerts = jsonRows(results[0]);
+    return (
+      alerts.where((a) => a['state'] == 'open').length,
+      alerts.where((a) => a['state'] != 'closed').length,
+      jsonRows(results[1]).length,
+    );
+  }, events: {'alert', 'changed'});
+});
+
 final fleetSummaryProvider = Provider<FleetSummary>((ref) {
   final devices = ref.watch(devicesProvider).value ?? const [];
   final alerts = ref.watch(alertsProvider).value ?? const [];
@@ -469,17 +513,24 @@ final fleetSummaryProvider = Provider<FleetSummary>((ref) {
   final leases = ref.watch(leasesProvider).value ?? const [];
   final zones = ref.watch(zonesProvider).value ?? const [];
   final safety = ref.watch(safetyProvider).value;
+  final live = ref.watch(liveRobotProvider) != null;
+  final counts = live ? ref.watch(liveSummaryCountsProvider).value : null;
   final groups = <String, int>{};
   for (final d in devices) {
+    if (d.groupId.isEmpty) continue;
     groups.update(d.groupId, (n) => n + 1, ifAbsent: () => 1);
   }
   return FleetSummary(
     total: devices.length,
     online: devices.where((d) => d.status.isOnline).length,
     alertDevices: devices.where((d) => d.status == DeviceStatus.alert).toList(),
-    openAlerts: alerts.where((a) => a.state == AlertState.open).length,
-    activeAlerts: alerts.where((a) => a.state != AlertState.closed).length,
-    fleetSessions: sessions.length,
+    openAlerts: live
+        ? (counts?.$1 ?? 0)
+        : alerts.where((a) => a.state == AlertState.open).length,
+    activeAlerts: live
+        ? (counts?.$2 ?? 0)
+        : alerts.where((a) => a.state != AlertState.closed).length,
+    fleetSessions: live ? (counts?.$3 ?? 0) : sessions.length,
     controlSessions: leases
         .where((l) => l.holderKind != LeaseHolderKind.task)
         .map(

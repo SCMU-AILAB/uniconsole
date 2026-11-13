@@ -57,8 +57,8 @@ class Device {
   final DeviceKind kind;
   final DeviceStatus status;
 
-  /// 0–100；离线时为最后一次上报值。
-  final int battery;
+  /// 0–100；离线时为最后一次上报值，未接入电池遥测时为 null。
+  final int? battery;
 
   /// 离线时为 null。
   final int? latencyMs;

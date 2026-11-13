@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/models.dart';
@@ -110,6 +111,24 @@ class ControlInput extends Notifier<ControlInputState> {
       _release?.cancel();
       if (_moving) ref.read(controlRepositoryProvider).stop(deviceId);
     });
+    final lifecycle = AppLifecycleListener(
+      onInactive: halt,
+      onPause: halt,
+      onDetach: halt,
+    );
+    ref.onDispose(lifecycle.dispose);
+    ref.listen(holdsLeaseProvider(deviceId), (_, holds) {
+      if (!holds) halt();
+    });
+    ref.listen(estopProvider(deviceId), (_, next) {
+      if (next.value != false) halt();
+    });
+    ref.listen(deviceProvider(deviceId), (_, device) {
+      if (device?.status.isOnline != true) halt();
+    });
+    ref.listen(controlConnectionProvider, (_, next) {
+      if (next.value != true) halt();
+    });
     return const ControlInputState();
   }
 
@@ -192,7 +211,11 @@ final leaseAutoRenewProvider = Provider.autoDispose.family<void, String>((
     if (lease?.expiresAt == null || !ref.read(holdsLeaseProvider(id))) return;
     if (lease!.expiresAt!.difference(DateTime.now()) <
         const Duration(seconds: 100)) {
-      ref.read(leaseRepositoryProvider).renew(id);
+      unawaited(
+        ref.read(leaseRepositoryProvider).renew(id).catchError((Object _) {
+          // 权限或网络失败时，下一次租约快照决定是否继续持有；不要产生未处理异常。
+        }),
+      );
     }
   });
   ref.onDispose(timer.cancel);

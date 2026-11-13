@@ -80,3 +80,8 @@ ADAPTER=go2agent NETWORK_INTERFACE=eth0 uv run uniagent
 2026-11-13 真机联调：ARM64 狗端、eth0 DDS、设备 `go2-cf-01`，验证真实姿态/位置上传、
 StopMove 回执和急停演练回执。回执表示 SDK 接受命令，走动/起身未在本次联调中执行。
 相机、点云、低层电池/关节数据仍需通过 Go2Agent 提供。
+
+本次部署的后端与狗端同网段：狗端 `192.168.31.74`，后端 `192.168.31.144:8800`。
+代理使用 `ws://192.168.31.144:8800/api/v1/robot/ws`，避免经过公网 FRP 转发。
+现场网络仍可能丢包，触发停止与重连。`extra.unavailable` 标明没有数据的字段；实际模式未知时 `mode=null`。
+前端联调步骤与验证范围见 [GO2_LIVE.md](../frontend/docs/GO2_LIVE.md)。

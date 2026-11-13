@@ -167,11 +167,13 @@ class Go2AgentBackend(RobotBackend):
             pitch=rpy[1],
             yaw=rpy[2],
             pose=Pose(x=pos[0], y=pos[1], yaw=rpy[2]),
-            mode=self._mode,
+            # 指令成功不等于实际姿态已经改变；原始 sport_mode 保留在 extra。
+            mode=self._mode if self._simulated else None,
             extra={
                 "sport_mode": d.get("mode"),
                 "gait_type": d.get("gait_type"),
                 "error_code": d.get("error_code"),
                 "hardware": state.hardware,
+                "unavailable": ["battery", "voltage", "current", "wz", "acc"],
             },
         )

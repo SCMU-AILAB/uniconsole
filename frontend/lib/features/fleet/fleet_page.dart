@@ -43,7 +43,7 @@ enum SyncCommand {
   };
 
   /// 急停中仍可下发的指令（§8.1：只保留趴下；语音不运动）。
-  bool get allowedInEstop => this == down || this == voice;
+  bool get allowedInEstop => this == voice;
 }
 
 /// 页面级 UI 状态：提示条、地图缩放、拖动后的编队位置。
@@ -313,7 +313,7 @@ class _SessionPageState extends ConsumerState<_SessionPage> {
               padding: const EdgeInsets.only(bottom: AppSpacing.x4),
               child: AppBanner(
                 kind: BannerKind.emergency,
-                message: '${estops.length} 台设备急停中 · 运动指令已禁用，只能趴下',
+                message: '${estops.length} 台设备急停中 · 运动指令已禁用',
               ),
             )
           : ui.notice != null

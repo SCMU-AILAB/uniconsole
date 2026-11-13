@@ -24,19 +24,30 @@ class DeviceDetailPage extends ConsumerWidget {
     final t = context.type;
     final d = ref.watch(deviceProvider(deviceId));
     if (d == null) {
-      return const AppPage(
+      final devices = ref.watch(devicesProvider);
+      return AppPage(
         title: '设备详情',
         largeTitle: false,
         backLabel: '设备',
-        children: [EmptyState(title: '找不到该设备')],
+        children: [
+          EmptyState(
+            title: devices.isLoading
+                ? '正在加载设备…'
+                : devices.hasError
+                ? '设备数据暂时不可用'
+                : '找不到该设备',
+            message: devices.hasError ? '${devices.error}' : null,
+          ),
+        ],
       );
     }
     final online = d.status.isOnline;
+    final live = ref.watch(liveRobotProvider) != null;
     final telemetry = online ? ref.watch(telemetryProvider(d.id)).value : null;
     final groups = ref.watch(deviceGroupsProvider).value ?? const [];
     final group =
         groups.where((g) => g.id == d.groupId).firstOrNull?.name ?? '';
-    final battery = telemetry?.battery ?? d.battery.toDouble();
+    final battery = telemetry?.battery ?? d.battery?.toDouble();
     final latency = telemetry?.latencyMs ?? d.latencyMs;
 
     void openControl() =>
@@ -59,10 +70,14 @@ class DeviceDetailPage extends ConsumerWidget {
       ],
       children: [
         VideoPanel(
-          placeholder: online ? '[实时画面]' : '[设备离线]',
+          placeholder: !online
+              ? '[设备离线]'
+              : live
+              ? '相机尚未接入'
+              : '[实时画面]',
           showCrosshair: false,
           hideBottomRightWhenNarrow: false,
-          topLeft: online ? const _LiveChip() : null,
+          topLeft: online && !live ? const _LiveChip() : null,
           bottomRight: online
               ? _PillButton(
                   label: '横屏操控',
@@ -108,7 +123,7 @@ class DeviceDetailPage extends ConsumerWidget {
                   SizedBox(
                     width: 80,
                     child: ProgressBar(
-                      value: online ? battery / 100 : 0,
+                      value: online ? (battery ?? 0) / 100 : 0,
                       height: 6,
                       semanticLabel: '电量',
                     ),
@@ -116,7 +131,7 @@ class DeviceDetailPage extends ConsumerWidget {
                   SizedBox(
                     width: 44,
                     child: Text(
-                      online ? '${battery.round()}%' : '—',
+                      online && battery != null ? '${battery.round()}%' : '—',
                       textAlign: TextAlign.right,
                       style: t.mobileBody.copyWith(color: c.secondaryLabel),
                     ),
@@ -126,7 +141,11 @@ class DeviceDetailPage extends ConsumerWidget {
             ),
             GroupedListRow(
               title: '链路延迟',
-              value: latency == null ? '—' : '$latency ms · 5 GHz Wi-Fi',
+              value: latency == null
+                  ? '—'
+                  : live
+                  ? '$latency ms'
+                  : '$latency ms · 5 GHz Wi-Fi',
             ),
             GroupedListRow(title: '位置', value: d.location),
             GroupedListRow(title: '当前任务', value: d.currentTask),
@@ -239,7 +258,11 @@ class _MobilePeople extends ConsumerWidget {
               ? '使用者 · 持有控制权'
               : '使用者 · 持有控制权 ${held.inMinutes} 分钟',
         ),
-        GroupedListRow(title: '授权使用者', value: '3 人', onTap: () {}),
+        GroupedListRow(
+          title: '授权使用者',
+          value:
+              '${ref.watch(membersProvider).value?.where((m) => m.grantedDeviceIds.contains(device.id)).length ?? 0} 人',
+        ),
         if (mine)
           Pressable(
             onTap: () {},

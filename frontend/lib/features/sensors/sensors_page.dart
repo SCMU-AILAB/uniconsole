@@ -616,19 +616,20 @@ class _ImuChart extends StatelessWidget {
     final c = context.colors;
     final s = context.status;
     final t = context.type;
-    final last = history.isEmpty ? null : history.last.accel;
+    final samples = history.where((h) => h.accel.length >= 3).toList();
+    final last = samples.isEmpty ? null : samples.last.accel;
     // Z 轴含重力（≈ 9.8），减去后与 X / Y 同量级绘制，读数仍显示原值。
     final series = [
       ChartSeries(
-        values: [for (final h in history) h.accel[0]],
+        values: [for (final h in samples) h.accel[0]],
         color: c.accent,
       ),
       ChartSeries(
-        values: [for (final h in history) h.accel[1]],
+        values: [for (final h in samples) h.accel[1]],
         color: s.warning.dot,
       ),
       ChartSeries(
-        values: [for (final h in history) h.accel[2] - 9.8],
+        values: [for (final h in samples) h.accel[2] - 9.8],
         color: c.decorativeGray,
       ),
     ];
@@ -652,7 +653,7 @@ class _ImuChart extends StatelessWidget {
         children: [
           LineChart(
             semanticLabel: '三轴加速度曲线',
-            series: history.length < 2 ? const [] : series,
+            series: samples.length < 2 ? const [] : series,
             minY: -1.5,
             maxY: 1.5,
             height: 96,
@@ -710,12 +711,10 @@ class _FootForces extends StatelessWidget {
                 ),
                 Expanded(
                   child: ProgressBar(
-                    value: tm == null
-                        ? 0
-                        : (tm!.footForces[i] / 160).clamp(0, 1),
+                    value: ((tm?.footForce(i) ?? 0) / 160).clamp(0, 1),
                     height: 8,
                     battery: false,
-                    color: tm == null || tm!.footForces[i] < 5
+                    color: (tm?.footForce(i) ?? 0) < 5
                         ? c.decorativeGrayLight
                         : context.status.online.dot,
                     semanticLabel: '${legs[i]} 接触力',
@@ -724,7 +723,9 @@ class _FootForces extends StatelessWidget {
                 SizedBox(
                   width: 40,
                   child: Text(
-                    tm == null ? '—' : '${tm!.footForces[i].round()}',
+                    tm?.footForce(i) == null
+                        ? '—'
+                        : '${tm!.footForce(i)!.round()}',
                     textAlign: TextAlign.right,
                     style: t.footnote.copyWith(color: c.tertiaryLabel),
                   ),

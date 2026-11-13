@@ -206,7 +206,8 @@ class MockAgentRepository implements AgentRepository {
     final online = world.devices.all.where((d) => d.status.isOnline).toList();
     final avg = online.isEmpty
         ? 0
-        : online.map((d) => d.battery).reduce((a, b) => a + b) ~/ online.length;
+        : online.map((d) => d.battery ?? 0).reduce((a, b) => a + b) ~/
+              online.length;
     final lines = [
       '今天的巡检报告：',
       '· 任务：${running.length} 个执行中（${running.map((m) => '${m.name} ${m.completed}/${m.waypoints.length}').join('、')}），${scheduled.length} 个已排期。',
@@ -222,7 +223,7 @@ class MockAgentRepository implements AgentRepository {
       for (final d in world.devices.all)
         if (d.status == DeviceStatus.online && world.leases.lease(d.id) == null)
           d,
-    ]..sort((a, b) => b.battery.compareTo(a.battery));
+    ]..sort((a, b) => (b.battery ?? -1).compareTo(a.battery ?? -1));
     if (idle.isEmpty) return _say('现在没有空闲的在线设备。');
     final best = idle.first;
     final rest = idle.skip(1).map((d) => '${d.name} ${d.battery}%').join('、');
@@ -296,7 +297,7 @@ class MockAgentRepository implements AgentRepository {
       checks: [
         PlanCheck(
           '电量充足（Alpha ${alpha.battery}%，Bravo ${bravo.battery}%）',
-          ok: alpha.battery >= 30 && bravo.battery >= 30,
+          ok: (alpha.battery ?? 0) >= 30 && (bravo.battery ?? 0) >= 30,
         ),
         const PlanCheck('路线不经过禁入区和限速区'),
         if (bravoFree)
@@ -753,7 +754,8 @@ class MockAgentRepository implements AgentRepository {
           AgentMessage(
             id: 'h4',
             role: AgentRole.agent,
-            text: '昨天的巡检报告：\n· 任务：巡检路线 B-2 执行 4 次，夜间巡检 C-1 执行 1 次。\n· 告警：3 条，均已关闭。',
+            text:
+                '昨天的巡检报告：\n· 任务：巡检路线 B-2 执行 4 次，夜间巡检 C-1 执行 1 次。\n· 告警：3 条，均已关闭。',
             at: y2,
           ),
         ],

@@ -242,7 +242,7 @@ class DeviceCard extends ConsumerWidget {
             children: [
               Expanded(
                 child: ProgressBar(
-                  value: off ? 0 : d.battery / 100,
+                  value: off ? 0 : (d.battery ?? 0) / 100,
                   semanticLabel: '电量',
                 ),
               ),
@@ -250,7 +250,7 @@ class DeviceCard extends ConsumerWidget {
               SizedBox(
                 width: 32,
                 child: Text(
-                  off ? '—' : '${d.battery}%',
+                  off || d.battery == null ? '—' : '${d.battery}%',
                   style: t.footnote.copyWith(color: c.tertiaryLabel),
                 ),
               ),

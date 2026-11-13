@@ -172,7 +172,9 @@ class ControlGate {
 }
 
 ControlGate watchGate(WidgetRef ref, Device d) => ControlGate(
-  online: d.status.isOnline,
+  online:
+      d.status.isOnline &&
+      (ref.watch(controlConnectionProvider).value ?? false),
   holds: ref.watch(holdsLeaseProvider(d.id)),
   estop: ref.watch(estopProvider(d.id)).value ?? false,
 );
@@ -207,9 +209,19 @@ class _ControlPageState extends ConsumerState<ControlPage> {
   Widget build(BuildContext context) {
     final d = ref.watch(deviceProvider(widget.deviceId));
     if (d == null) {
-      return const AppPage(
+      final devices = ref.watch(devicesProvider);
+      return AppPage(
         title: '单机操控',
-        children: [EmptyState(title: '找不到该设备')],
+        children: [
+          EmptyState(
+            title: devices.isLoading
+                ? '正在加载设备…'
+                : devices.hasError
+                ? '设备数据暂时不可用'
+                : '找不到该设备',
+            message: devices.hasError ? '${devices.error}' : null,
+          ),
+        ],
       );
     }
     ref.watch(leaseAutoRenewProvider(d.id));
@@ -537,8 +549,13 @@ class _Video extends ConsumerWidget {
         : null;
     final mode = tm?.mode == null ? null : MotionMode.values.byName(tm!.mode!);
 
+    final live = ref.watch(liveRobotProvider) != null;
     return VideoPanel(
-      placeholder: gate.online ? '[${ui.camera.label}视频流 · WebRTC]' : '[设备离线]',
+      placeholder: !gate.online
+          ? '[设备离线]'
+          : live
+          ? '相机尚未接入'
+          : '[${ui.camera.label}视频流 · WebRTC]',
       topLeft: HudSegmented<Camera>(
         semanticLabel: '摄像头',
         options: [for (final cam in Camera.values) (cam, cam.label)],
@@ -547,7 +564,7 @@ class _Video extends ConsumerWidget {
             .read(controlUiProvider(d.id).notifier)
             .update((s) => s.copyWith(camera: cam)),
       ),
-      topRight: gate.online
+      topRight: gate.online && !live
           ? LiveIndicator(
               detail:
                   '1280×720 · 30 fps · 端到端 ${(tm?.latencyMs ?? d.latencyMs ?? 0) + 30} ms',
@@ -557,7 +574,12 @@ class _Video extends ConsumerWidget {
         metrics: [
           HudMetric('前进 vx', tm == null ? '—' : '${signed(tm.vx)} m/s'),
           HudMetric('横移 vy', tm == null ? '—' : '${signed(tm.vy)} m/s'),
-          HudMetric('转向 ωz', tm == null ? '—' : '${signed(tm.wz)} rad/s'),
+          HudMetric(
+            '转向 ωz',
+            tm == null || tm.unavailable.contains('wz')
+                ? '—'
+                : '${signed(tm.wz)} rad/s',
+          ),
           HudMetric('步态', mode?.label ?? '—'),
         ],
       ),
@@ -595,7 +617,7 @@ class _Video extends ConsumerWidget {
                   const SizedBox(width: AppSpacing.x2),
                   Flexible(
                     child: Text(
-                      '已触发急停 · 电机进入阻尼模式，所有运动指令被拒绝',
+                      '已触发急停 · 所有运动指令被拒绝',
                       style: context.type.body.copyWith(
                         color: c.onAccent,
                         fontWeight: FontWeight.w600,
@@ -632,11 +654,9 @@ class _ControlPad extends ConsumerWidget {
     final tm = gate.online ? ref.watch(telemetryProvider(d.id)).value : null;
     final mode = tm?.mode == null ? null : MotionMode.values.byName(tm!.mode!);
     final notifier = ref.read(controlInputProvider(d.id).notifier);
-    // 急停时仍允许「趴下」「阻尼」这类让设备停下的动作。
+    // 与服务器一致：急停时只允许阻尼等停止类指令。
     bool modeEnabled(MotionMode m) =>
-        gate.online &&
-        gate.holds &&
-        (!gate.estop || m == MotionMode.down || m == MotionMode.damp);
+        gate.online && gate.holds && (!gate.estop || m == MotionMode.damp);
 
     Widget label(String s) => Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.x2),
@@ -841,7 +861,7 @@ class _PowerCard extends ConsumerWidget {
     final t = context.type;
     final online = device.status.isOnline;
     final tm = online ? ref.watch(telemetryProvider(device.id)).value : null;
-    final battery = tm?.battery ?? (online ? device.battery.toDouble() : null);
+    final battery = tm?.battery ?? (online ? device.battery?.toDouble() : null);
     final minutes = battery == null ? null : (battery * 1.3).round();
 
     Widget metric(String k, String v) => Column(
@@ -858,7 +878,7 @@ class _PowerCard extends ConsumerWidget {
       gap: AppSpacing.x3,
       trailing: Text(
         minutes == null
-            ? '离线'
+            ? (online ? '暂无电量数据' : '离线')
             : minutes >= 60
             ? '预计剩余 ${minutes ~/ 60} 小时 ${minutes % 60} 分'
             : '预计剩余 $minutes 分',
@@ -1031,7 +1051,7 @@ class JointTempsCard extends ConsumerWidget {
                 ),
                 for (var j = 0; j < 3; j++) ...[
                   if (j > 0) const SizedBox(width: AppSpacing.x2),
-                  Expanded(child: cell(tm?.jointTemps[leg][j])),
+                  Expanded(child: cell(tm?.jointTemp(leg, j))),
                 ],
               ],
             ),

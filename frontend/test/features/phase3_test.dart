@@ -171,7 +171,7 @@ void main() {
       await close(tester);
     });
 
-    testWidgets('键盘 W 前进；空格急停后运动控件全部禁用，「趴下」仍可用', (tester) async {
+    testWidgets('键盘 W 前进；空格急停后运动控件全部禁用，「趴下」同样禁用', (tester) async {
       final container = await open(
         tester,
         location: Routes.control('go2-01'),
@@ -202,12 +202,31 @@ void main() {
         ),
       );
       expect((mode('行走') as dynamic).onPressed, isNull);
-      expect((mode('趴下') as dynamic).onPressed, isNotNull);
+      expect((mode('趴下') as dynamic).onPressed, isNull);
 
       // 再按一次空格解除。
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pump(const Duration(milliseconds: 400));
       expect(container.read(estopProvider('go2-01')).value, isFalse);
+      await close(tester);
+    });
+
+    testWidgets('窗口失去焦点后清空按键并停止，恢复焦点不重放输入', (tester) async {
+      final container = await open(
+        tester,
+        location: Routes.control('go2-01'),
+        settle: false,
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(container.read(controlInputProvider('go2-01')).active, true);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(container.read(controlInputProvider('go2-01')).active, false);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(container.read(controlInputProvider('go2-01')).active, false);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       await close(tester);
     });
 

@@ -162,7 +162,7 @@ class MockDeviceRepository implements DeviceRepository {
 /// 任务中的设备在无人操控时按巡检路线自主行走。
 class MockRobot {
   MockRobot(this.device, {required this.hz})
-    : battery = device.battery.toDouble(),
+    : battery = device.battery?.toDouble() ?? 0,
       mode = MockSeed.modeFor(device.status),
       joints = MockSeed.jointsFor(device.id, device.maxMotorTemp ?? 40),
       _rnd = math.Random(device.id.hashCode);

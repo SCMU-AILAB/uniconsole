@@ -42,7 +42,7 @@ void main() {
     expect(world.fleet.robot('go2-03')!.mode, MotionMode.walk);
   });
 
-  test('急停：运动指令被拒绝（423），趴下仍允许；任何人都能触发急停', () async {
+  test('急停：运动指令被拒绝（423），趴下同样被拒绝；任何人都能触发急停', () async {
     await world.fleet.setEstop('go2-03', active: true); // 不需要控制权
     expect(await world.fleet.watchEstop('go2-03').first, isTrue);
 
@@ -56,7 +56,7 @@ void main() {
       'go2-01',
       const SetModeCommand(MotionMode.down),
     );
-    expect(down.ok, isTrue);
+    expect(down.error, CommandError.estopActive);
 
     final log = await world.fleet.watchLog('go2-01').first;
     expect(log.first.text, contains('SwitchGait(down)'));
