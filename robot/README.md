@@ -50,3 +50,33 @@ ADAPTER=go2agent NETWORK_INTERFACE=eth0 uv run uniagent
 - Go2Agent 目前只订阅 `rt/sportmodestate`，遥测中没有电量 / 关节温度（`battery` 为空）。
   TODO：订阅 `rt/lowstate` 补齐电量、关节温度、足端力。
 - SDK 返回 0 只表示命令被接受，不代表动作物理完成。软件急停（`damp` / `stop_move`）不是物理急停，现场必须备好遥控器。
+
+## 已有 Go2Agent 环境的部署
+
+狗端已有可用的 Go2Agent 与原生 bindings 时，优先复用该环境（不会更新 Go2Agent 或覆盖其本地修改）：
+
+1. 将 `robot/` 同步到狗端 `~/uniconsole/robot`，排除 `.env`、`.venv` 和缓存。
+2. 创建权限为 `600` 的 `.env`，填写服务器注册设备返回的 `DEVICE_ID` / `DEVICE_TOKEN`。
+   使用 `ADAPTER=go2agent`、`NETWORK_INTERFACE=eth0`、`API_HOST=127.0.0.1`、`API_PORT=18000`。
+   `ESTOP_MODE=stop` 使用 StopMove；若现场选择阻尼卸力，则配置 `damp`。
+3. 确认没有其他 Go2Agent / DDS 控制进程，然后运行：
+
+   ```bash
+   cd ~/uniconsole/robot
+   bash deploy/install-local-go2.sh ~/Go2Agent
+   loginctl enable-linger "$USER"  # 使用户服务在退出 SSH 后及开机时继续运行
+   systemctl --user status uniagent
+   journalctl --user -u uniagent -n 50
+   curl http://127.0.0.1:18000/health
+   ```
+
+安装脚本使用 Go2Agent 同版本 Python，在独立 uv 环境中引用原有 site-packages 和源码。
+日常更新后使用 `systemctl --user restart uniagent`，停止使用 `systemctl --user stop uniagent`。
+不要同时手动启动第二个 uniagent。
+
+长连接在服务端指定的心跳超时后立即清理指令任务并停止；重连不会重放旧指令。
+服务退出会等待网络任务结束、执行停止，再关闭 DDS。遥测缺失时不发送模拟帧。
+
+2026-11-13 真机联调：ARM64 狗端、eth0 DDS、设备 `go2-cf-01`，验证真实姿态/位置上传、
+StopMove 回执和急停演练回执。回执表示 SDK 接受命令，走动/起身未在本次联调中执行。
+相机、点云、低层电池/关节数据仍需通过 Go2Agent 提供。

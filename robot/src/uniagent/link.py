@@ -44,6 +44,7 @@ class ServerLink:
         self._ws: ClientConnection | None = None
         self._send_lock = asyncio.Lock()
         self._telemetry_hz = self.settings.telemetry_hz
+        self._commands: set[asyncio.Task] = set()
 
     async def send(self, msg: BaseModel) -> None:
         ws = self._ws
@@ -121,16 +122,24 @@ class ServerLink:
         self.last_error = None
         log.info("已连接服务器 %s（遥测 %d Hz）", self.settings.server_url, self._telemetry_hz)
 
-        await self.send(StateMsg(status="online"))
-
         telemetry = asyncio.ensure_future(self._telemetry_loop())
         cloud = asyncio.ensure_future(self._pointcloud_loop())
         try:
-            async for raw in ws:
+            await self.send(StateMsg(status="online"))
+            while True:
+                # TCP 半开连接不会触发 close；按服务端心跳策略主动断开并停止。
+                raw = await asyncio.wait_for(ws.recv(), max(0.1, welcome.heartbeat_timeout_ms / 1000))
                 await self._on_message(raw)
         finally:
-            telemetry.cancel()
-            cloud.cancel()
+            self.connected = False
+            self._ws = None
+            pending = [telemetry, cloud, *self._commands]
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            self._commands.clear()
+            # 在 WebSocket close 握手之前停止，不能让网络超时延迟硬件停止。
+            await self.controller.on_link_lost()
 
     async def _pointcloud_loop(self, hz: float = 5.0) -> None:
         """点云二进制帧：[ts i64 LE][N × (f32 x, f32 y) LE]，后端不支持时直接退出。"""
@@ -168,7 +177,9 @@ class ServerLink:
             await self.send(Pong(nonce=msg.nonce))
         elif isinstance(msg, CommandMsg):
             # 不阻塞接收循环：SDK 调用可能耗时，急停必须能及时进来
-            asyncio.ensure_future(self._execute(msg))
+            task = asyncio.create_task(self._execute(msg))
+            self._commands.add(task)
+            task.add_done_callback(self._commands.discard)
         elif isinstance(msg, ZonesMsg):
             self.controller.zones = msg.zones
             log.info("收到电子围栏 %d 个", len(msg.zones))

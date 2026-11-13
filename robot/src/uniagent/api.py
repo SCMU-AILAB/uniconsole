@@ -48,6 +48,7 @@ def create_app(settings: Settings | None = None, connect_server: bool = True) ->
         finally:
             for t in tasks:
                 t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             try:
                 await controller.stop()
             except AdapterError:
