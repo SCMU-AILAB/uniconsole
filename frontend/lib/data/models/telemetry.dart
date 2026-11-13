@@ -94,10 +94,15 @@ class Pose {
 /// 一帧点云：机器人坐标系下的点（米），+y 朝前、+x 朝右，机器人在原点。
 @immutable
 class PointCloudFrame {
-  const PointCloudFrame({required this.ts, required this.points});
+  const PointCloudFrame({
+    required this.ts,
+    required this.points,
+    this.available = true,
+  });
 
   final DateTime ts;
   final List<Offset> points;
+  final bool available;
 }
 
 enum SourceHealth { ok, degraded, idle }

@@ -22,7 +22,7 @@ use axum::{
     response::Response,
 };
 use futures::{SinkExt, StreamExt};
-use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::{broadcast::error::RecvError, mpsc};
 use uuid::Uuid;
 
 use crate::{
@@ -88,6 +88,25 @@ fn cloud_frame(device_id: &str, frame: &Bytes) -> Message {
 
 async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, socket: WebSocket) {
     let (mut sink, mut stream) = socket.split();
+    // 写出和接收分离：慢速公网点云不能阻塞上行 Stop / 急停。
+    let (tx, mut replies) = mpsc::channel::<Message>(64);
+    let (cloud_tx, mut cloud_out) = mpsc::channel::<Message>(1);
+    let mut writer = tokio::spawn(async move {
+        loop {
+            let frame = tokio::select! {
+                biased;
+                reply = replies.recv() => reply,
+                cloud = cloud_out.recv() => cloud,
+            };
+            let Some(frame) = frame else { break };
+            if !matches!(
+                tokio::time::timeout(Duration::from_secs(2), sink.send(frame)).await,
+                Ok(Ok(()))
+            ) {
+                break;
+            }
+        }
+    });
     let mut events = st.hub.subscribe();
     let mut clouds_rx = st.hub.subscribe_pointcloud();
     let mut conn = Conn {
@@ -105,6 +124,7 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
 
     loop {
         tokio::select! {
+            _ = &mut writer => break,
             frame = stream.next() => {
                 let text = match frame {
                     Some(Ok(Message::Text(t))) => t,
@@ -116,7 +136,7 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                     Ok(msg) => on_message(&st, &user, msg, &mut conn, &can_see).await,
                 };
                 if let Some(r) = reply
-                    && sink.send(json(&r)).await.is_err() { break; }
+                    && tx.try_send(json(&r)).is_err() { break; }
             }
             ev = events.recv() => {
                 let ev = match ev {
@@ -138,14 +158,15 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
                         Subs::Some(set) => set.contains(id),
                     },
                 };
-                if deliver && sink.send(json(&ev)).await.is_err() {
+                if deliver && tx.try_send(json(&ev)).is_err() {
                     break;
                 }
             }
             frame = clouds_rx.recv(), if !conn.clouds.is_empty() => {
                 match frame {
                     Ok(f) if conn.clouds.contains(&f.0) => {
-                        if sink.send(cloud_frame(&f.0, &f.1)).await.is_err() { break; }
+                        // 点云只保留一个待发帧；队列满即丢弃，避免累积过期数据。
+                        let _ = cloud_tx.try_send(cloud_frame(&f.0, &f.1));
                     }
                     Ok(_) | Err(RecvError::Lagged(_)) => {}
                     Err(RecvError::Closed) => break,
@@ -153,6 +174,8 @@ async fn handle(st: AppState, user: AuthUser, visible: Option<HashSet<String>>, 
             }
         }
     }
+
+    writer.abort();
 
     st.webrtc.client_gone(&st, conn.id);
     for id in conn.driving {

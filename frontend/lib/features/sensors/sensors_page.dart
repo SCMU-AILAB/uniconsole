@@ -8,6 +8,7 @@ import '../../core/theme/theme.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/models/models.dart';
 import '../../data/providers.dart';
+import '../control/camera_player.dart';
 import '../control/control_page.dart' show JointTempsCard, signed;
 
 enum SensorTab {
@@ -90,7 +91,7 @@ class _SensorsPageState extends ConsumerState<SensorsPage> {
     final cloudPanel = _CloudPanel(
       points: cloud?.points ?? const [],
       online: online,
-      lidar: status?.lidar ?? '—',
+      lidar: cloud?.available == true ? status?.lidar ?? '—' : '等待雷达数据',
       view: _view,
       onView: (v) => setState(() => _view = v),
       overlays: _overlays,
@@ -100,6 +101,8 @@ class _SensorsPageState extends ConsumerState<SensorsPage> {
       tall: _tab == SensorTab.lidar,
     );
     final cams = _CameraGrid(
+      deviceId: d.id,
+      paused: _frozen != null,
       cameras: status?.cameras ?? const [],
       online: online,
     );
@@ -152,6 +155,8 @@ class _SensorsPageState extends ConsumerState<SensorsPage> {
       ],
       SensorTab.cameras => [
         _CameraGrid(
+          deviceId: d.id,
+          paused: _frozen != null,
           cameras: status?.cameras ?? const [],
           online: online,
           large: true,
@@ -480,11 +485,15 @@ class _HudToggle extends StatelessWidget {
 /// 摄像头 2×2（4:3）。
 class _CameraGrid extends StatelessWidget {
   const _CameraGrid({
+    required this.deviceId,
+    required this.paused,
     required this.cameras,
     required this.online,
     this.large = false,
   });
 
+  final String deviceId;
+  final bool paused;
   final List<SensorSource> cameras;
   final bool online;
   final bool large;
@@ -496,7 +505,7 @@ class _CameraGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) {
         const gap = AppSpacing.x3;
-        final cols = box.maxWidth < 280 ? 1 : 2;
+        final cols = box.maxWidth < 560 || cameras.length < 2 ? 1 : 2;
         final w = (box.maxWidth - gap * (cols - 1)) / cols;
         return Wrap(
           spacing: gap,
@@ -517,56 +526,19 @@ class _CameraGrid extends StatelessWidget {
                               : c.videoBackground,
                           borderRadius: BorderRadius.circular(AppRadius.group),
                         ),
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: AppSpacing.x2,
-                              top: AppSpacing.x2,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.x2,
-                                  vertical: AppSpacing.half,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: c.pressShade.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.tag,
+                        clipBehavior: Clip.antiAlias,
+                        child:
+                            !paused &&
+                                (cam.id == 'front' || cam.name == 'front')
+                            ? CameraFeed(deviceId: deviceId, online: online)
+                            : Center(
+                                child: Text(
+                                  paused ? '视频已暂停' : '此相机尚未接入视频',
+                                  style: t.caption.copyWith(
+                                    color: c.hudSecondary,
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: cam.health == SourceHealth.ok
-                                            ? c.live
-                                            : c.decorativeGray,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppSpacing.x1),
-                                    Text(
-                                      cam.health == SourceHealth.ok
-                                          ? 'LIVE'
-                                          : '待机',
-                                      style: t.micro.copyWith(color: c.hudText),
-                                    ),
-                                  ],
-                                ),
                               ),
-                            ),
-                            Center(
-                              child: Text(
-                                '[${cam.name}画面]',
-                                style: t.caption.copyWith(
-                                  color: c.hudSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.x2),

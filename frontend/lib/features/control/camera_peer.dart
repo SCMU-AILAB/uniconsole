@@ -17,6 +17,8 @@ abstract class CameraPeer {
 }
 
 class FlutterCameraPeer extends CameraPeer {
+  FlutterCameraPeer({this.relayOnly = false});
+  final bool relayOnly;
   final _renderer = RTCVideoRenderer();
   RTCPeerConnection? _peer;
   final _streams = <MediaStream>{};
@@ -40,6 +42,7 @@ class FlutterCameraPeer extends CameraPeer {
     final peer = _peer = await createPeerConnection({
       'iceServers': iceServers,
       'sdpSemantics': 'unified-plan',
+      'iceTransportPolicy': relayOnly ? 'relay' : 'all',
     });
     peer.onIceCandidate = (c) {
       if (!_disposed && c.candidate?.isNotEmpty == true) {
@@ -121,6 +124,25 @@ class FlutterCameraPeer extends CameraPeer {
     final sdp = description.sdp;
     if (sdp == null || sdp.isEmpty) throw StateError('无法创建视频连接');
     return sdp;
+  }
+
+  /// Used by native integration tests to verify an actual TURN path.
+  Future<bool> usesRelay() async {
+    final reports = await _peer!.getStats();
+    final byId = {for (final report in reports) report.id: report};
+    for (final report in reports) {
+      if (report.type != 'candidate-pair' ||
+          report.values['state'] != 'succeeded') {
+        continue;
+      }
+      if (report.values['nominated'] != true &&
+          report.values['selected'] != true) {
+        continue;
+      }
+      final local = byId[report.values['localCandidateId']];
+      if (local?.values['candidateType'] == 'relay') return true;
+    }
+    return false;
   }
 
   @override

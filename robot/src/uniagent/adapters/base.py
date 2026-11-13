@@ -87,5 +87,8 @@ class RobotBackend(ABC):
         """非阻塞读取 Go2Agent 已采集的最新 JPEG；不在控制事件循环采集。"""
         return None
 
+    def lidar_info(self) -> dict[str, Any] | None:
+        return None
+
     @abstractmethod
     async def telemetry(self) -> Telemetry: ...

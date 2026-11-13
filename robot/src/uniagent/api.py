@@ -84,6 +84,7 @@ def create_app(settings: Settings | None = None, connect_server: bool = True) ->
             "moving": c.moving,
             "video_sessions": len(link.video.sessions) if link.video is not None else 0,
             "camera_frame_age_ms": round((time.monotonic() - frame.stamp) * 1000) if frame else None,
+            "lidar": c.backend.lidar_info(),
         }
 
     @app.get("/info")

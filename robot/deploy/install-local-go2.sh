@@ -25,9 +25,12 @@ PY
 .venv/bin/python -c 'import unitree_sdk2_cpp; from core.runtime import SkillRuntime; from robot import UnitreeGo2Adapter'
 .venv/bin/python - <<'PY'
 from uniagent.config import Settings
-if Settings.from_env().video_enabled:
+settings = Settings.from_env()
+if settings.video_enabled:
     import aiortc
     from perception.go2_front import Go2FrontCamera
+if settings.lidar_enabled:
+    from perception.go2_lidar import Go2Lidar
 PY
 chmod 600 .env
 mkdir -p "$HOME/.config/systemd/user"

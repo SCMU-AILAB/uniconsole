@@ -599,7 +599,7 @@ class _Video extends ConsumerWidget {
               child: PointCloudView(
                 points: cloud.points,
                 rangeMeters: 4,
-                label: '雷达俯视',
+                label: cloud.available ? '雷达俯视' : '等待雷达数据',
                 semanticLabel: '雷达俯视小窗',
               ),
             ),

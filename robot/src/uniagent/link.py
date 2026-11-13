@@ -160,7 +160,10 @@ class ServerLink:
         while True:
             pts = await self.controller.backend.pointcloud()
             if pts is None:
-                return
+                if "pointcloud" not in self.controller.backend.capabilities:
+                    return
+                await asyncio.sleep(1.0 / hz)
+                continue
             ws = self._ws
             if ws is not None:
                 frame = struct.pack("<q", int(time.time() * 1000)) + b"".join(

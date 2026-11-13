@@ -620,6 +620,10 @@ Recording = {"id": "uuid", "name": "Charlie 电机过热", "device_ids": ["go2-0
 
 **点云二进制帧**（`pointcloud` 开启后，约 5–10 Hz）：
 `[device_id 长度 u8][device_id UTF-8][ts i64 LE，毫秒][N × (f32 x, f32 y) LE]`，单位米，机器人坐标系 +y 朝前、+x 朝右。
+Go2 实机目前每秒最多 5 帧、每帧最多 6000 点。遥测 `extra.lidar.source` 区分 `pointcloud` 与
+`height_map`；后者为高程图障碍投影。前端对同设备共享订阅，最后一个观看者离开时关闭，断线或 2 秒无帧清空。
+WebSocket 写出与消息接收独立：可靠事件优先，点云只保留一个待发帧，满时丢帧；
+单次写出超过 2 秒或可靠队列溢出会断开连接并执行原有断线停止，避免慢客户端无限积压。
 
 `changed.resource` 取值（`id` 为空表示整个列表都变了）：
 
@@ -700,4 +704,5 @@ Go2 机器人端使用 Go2Agent `perception.go2_front` 采集前置相机，通�
 默认 640×360、10 帧/秒、最多两个观看会话。answer 的 SDP 包含已收集的 ICE candidate；
 客户端可发送 trickle ICE。客户端重试应使用新的 `session_id`，狗端会关闭重复使用的会话。
 缺失相机、失帧或协商失败通过 `webrtc_close.reason` 返回；视频不包含音频，也不需要控制权租约。
-当前实机验证为同网段媒体直连，跨网且无法直连时需实际部署并配置 TURN。
+公网 TURN 已部署到 `1.13.195.109:3478`，后端优先提供 TCP 中继以适配受限 UDP 网络。
+安装脚本、端口与验证范围见 [TURN 部署](../deploy/turn.md)。

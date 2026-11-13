@@ -303,11 +303,14 @@ void main() {
     testWidgets('点云、四路摄像头、话题健康；暂停画面冻结时间戳', (tester) async {
       await open(tester, location: Routes.sensors('go2-01'), settle: false);
       expect(find.text('激光雷达 · 点云'), findsOneWidget);
-      expect(find.text('[前置 RGB画面]'), findsOneWidget);
+      expect(find.text('前置 RGB'), findsOneWidget);
+      expect(find.text('此相机尚未接入视频'), findsNWidgets(4));
+      expect(find.text('LIVE'), findsNothing);
       expect(find.text('rt/odom'), findsOneWidget);
 
       await tester.tap(find.bySemanticsLabel('暂停画面'));
       await tester.pump();
+      expect(find.text('视频已暂停'), findsNWidgets(4));
       final frozen = find.textContaining('已暂停 ·');
       expect(frozen, findsOneWidget);
       final text = tester.widget<Text>(frozen).data;

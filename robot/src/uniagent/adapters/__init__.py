@@ -18,6 +18,7 @@ def create_backend(settings: Settings) -> RobotBackend:
             simulated=settings.go2agent_simulated,
             video_enabled=settings.video_enabled,
             video_fps=settings.video_fps,
+            lidar_enabled=settings.lidar_enabled,
         )
     raise ValueError(f"未知后端 {settings.adapter}（可选：mock、go2agent）")
 

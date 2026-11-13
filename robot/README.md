@@ -79,7 +79,7 @@ ADAPTER=go2agent NETWORK_INTERFACE=eth0 uv run uniagent
 
 2026-11-13 真机联调：ARM64 狗端、eth0 DDS、设备 `go2-cf-01`，验证真实姿态/位置上传、
 StopMove 回执和急停演练回执。回执表示 SDK 接受命令，走动/起身未在本次联调中执行。
-前置相机现已接入 WebRTC；点云、低层电池/关节数据仍需通过 Go2Agent 提供。
+前置相机和真实雷达点云现已接入；低层电池/关节数据仍需通过 Go2Agent 提供。
 
 本次部署的后端与狗端同网段：狗端 `192.168.31.74`，后端 `192.168.31.144:8800`。
 代理使用 `ws://192.168.31.144:8800/api/v1/robot/ws`，避免经过公网 FRP 转发。
@@ -109,6 +109,21 @@ JPEG 解码和视频编码在工作线程执行；发送端丢弃积压帧，控
 
 WebRTC 信令沿用后端鉴权，媒体直接连接狗端；跨网段且无法直连时，需要在后端配置可达的 TURN
 （`TURN_URLS` / `TURN_SECRET`），仅转发 HTTP/WebSocket 的 FRP 不会转发视频 UDP。
-当前验证在同一局域网完成，经过公网后端信令收到连续真实视频帧。
+公网 TURN 已部署，配置和端口说明见 [TURN 部署](../server/deploy/turn.md)。
 
 视频回归测试：`uv run --extra video pytest`。本地测试用生成图像和假相机，不连接真实 DDS。
+
+## 雷达点云
+
+设置 `LIDAR_ENABLED=1`，并先安装 Go2Agent 的 `perception.go2_lidar.Go2Lidar` 模块。
+旧版布局对应 `feat/uniconsole-front-camera` 分支提交 `6e47beb`，本次狗端已部署。
+它共享已有 DDS，优先订阅 `rt/utlidar/cloud_deskewed`，其次为 `rt/utlidar/cloud`；
+缺失原始点云时可使用 `rt/utlidar/height_map_array`，界面会明确标注为「高程图障碍投影」。
+`odom` 数据使用新鲜且同坐标系的 `rt/utlidar/robot_pose` 转为机器人坐标，+x 朝右、+y 朝前，单位米。
+未知坐标系或数据超过 1 秒不发送；解析在工作线程执行，不创建第二个 DDS 所有者。
+
+目前输出二维俯视投影，保留原始点云中的地面点，不代表避障判断，也不包含三维建图。
+最多每秒 5 帧、每帧 6,000 点，使用已鉴权 WebSocket，经公网后端转发，无需单独开放雷达端口。
+前端仅在有人观看时订阅，断线或 2 秒无新帧后清空旧点；狗端短暂缺帧后自动恢复发送。
+`/health` 和遥测 `extra.lidar` 提供 source、age_ms、points、DDS 话题计数与错误状态。
+本次真机实际来源为去畸变 PointCloud2，每帧约 5,600 点。

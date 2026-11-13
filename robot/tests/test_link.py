@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import struct
 
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
@@ -69,5 +70,40 @@ def test_silent_server_cancels_command_and_stops_before_close():
                 assert not link.connected and not link._commands
                 assert backend.calls[-1] == ("stop",)
                 release.set()
+
+    asyncio.run(scenario())
+
+
+def test_pointcloud_recovers_after_missing_frames():
+    async def scenario():
+        class IntermittentLidar(MockBackend):
+            capabilities = (*MockBackend.capabilities, "pointcloud")
+
+            def __init__(self):
+                super().__init__()
+                self.frames = iter([None, [(1.0, -2.0)], None, [(3.0, 4.0)]])
+
+            async def pointcloud(self):
+                return next(self.frames, None)
+
+        frames = []
+        received = asyncio.Event()
+
+        class Socket:
+            async def send(self, data):
+                frames.append(data)
+                if len(frames) == 2:
+                    received.set()
+
+        link = ServerLink(Controller(IntermittentLidar(), Settings()))
+        link._ws = Socket()
+        task = asyncio.create_task(link._pointcloud_loop(hz=100))
+        try:
+            await asyncio.wait_for(received.wait(), 1)
+            assert struct.unpack("<ff", frames[0][8:]) == (1.0, -2.0)
+            assert struct.unpack("<ff", frames[1][8:]) == (3.0, 4.0)
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
     asyncio.run(scenario())

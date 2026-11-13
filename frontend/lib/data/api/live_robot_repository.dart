@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' show Offset;
 
 import '../models/models.dart';
 import '../repositories/camera_signaling.dart';
@@ -13,6 +15,34 @@ Map<String, dynamic> jsonMap(Object? value) =>
 List<Map<String, dynamic>> jsonRows(Object? value) =>
     (value as List).map(jsonMap).toList();
 DateTime? jsonTime(Object? value) => DateTime.tryParse('$value')?.toLocal();
+
+/// Server envelope: id length u8, UTF-8 id, timestamp i64 LE, pairs f32 LE.
+({String deviceId, PointCloudFrame frame})? decodePointCloud(List<int> raw) {
+  if (raw.isEmpty || raw.length > 512 * 1024 + 256) return null;
+  final idLength = raw[0], offset = 1 + raw[0];
+  if (idLength == 0 ||
+      raw.length < offset + 8 ||
+      (raw.length - offset - 8) % 8 != 0) {
+    return null;
+  }
+  try {
+    final id = utf8.decode(raw.sublist(1, offset));
+    final bytes = ByteData.sublistView(Uint8List.fromList(raw));
+    final ts = DateTime.fromMillisecondsSinceEpoch(
+      bytes.getInt64(offset, Endian.little),
+    );
+    final points = <Offset>[];
+    for (var i = offset + 8; i < raw.length; i += 8) {
+      final x = bytes.getFloat32(i, Endian.little),
+          y = bytes.getFloat32(i + 4, Endian.little);
+      if (x.isFinite && y.isFinite) points.add(Offset(x, y));
+    }
+    return (deviceId: id, frame: PointCloudFrame(ts: ts, points: points));
+  } on Object {
+    return null;
+  }
+}
+
 double number(Object? value, [double fallback = 0]) =>
     (value as num?)?.toDouble() ?? fallback;
 
@@ -108,6 +138,10 @@ class LiveRobotRepository
   final _latest = <String, Telemetry>{};
   final _localLogs = <String, List<CommandLogEntry>>{};
   final _driving = <String>{};
+  final _cloudListeners = <String, int>{};
+  final _cloudEvents =
+      StreamController<({String deviceId, PointCloudFrame frame})>.broadcast();
+  final _lidarInfo = <String, Map<String, dynamic>>{};
   WebSocket? _socket;
   HttpClient? _connectingClient;
   Timer? _retry;
@@ -205,14 +239,28 @@ class LiveRobotRepository
       connectionError = null;
       ws.pingInterval = const Duration(seconds: 2);
       ws.add(jsonEncode({'type': 'subscribe', 'device_ids': <String>[]}));
+      for (final id in _cloudListeners.keys) {
+        ws.add(
+          jsonEncode({'type': 'pointcloud', 'device_id': id, 'enable': true}),
+        );
+      }
       _connection.add(true);
       _events.add({'type': 'connected'});
       await for (final raw in ws) {
         if (_disposed) break;
+        if (raw is List<int>) {
+          final cloud = decodePointCloud(raw);
+          if (cloud != null && _cloudListeners.containsKey(cloud.deviceId)) {
+            _cloudEvents.add(cloud);
+          }
+          continue;
+        }
         if (raw is! String) continue;
         final j = jsonMap(jsonDecode(raw));
         if (j['type'] == 'telemetry') {
           _latest[j['device_id']] = telemetryFromJson(j);
+          final lidar = (j['extra'] as Map?)?['lidar'];
+          if (lidar is Map) _lidarInfo[j['device_id']] = jsonMap(lidar);
         }
         if (j['type'] == 'error') {
           for (final id in _driving.toList()) {
@@ -230,6 +278,7 @@ class LiveRobotRepository
       client.close(force: true);
       _socket = null;
       _latest.clear();
+      _lidarInfo.clear();
       _driving.clear();
       if (!_disposed) {
         _connection.add(false);
@@ -468,11 +517,72 @@ class LiveRobotRepository
   });
   @override
   Stream<PointCloudFrame> watchPointCloud(String deviceId) =>
-      const Stream.empty();
+      Stream<PointCloudFrame>.multi((out) {
+        if (_disposed) {
+          out.close();
+          return;
+        }
+        final count = _cloudListeners[deviceId] ?? 0;
+        _cloudListeners[deviceId] = count + 1;
+        if (count == 0 && connected) {
+          _cameraSend({
+            'type': 'pointcloud',
+            'device_id': deviceId,
+            'enable': true,
+          });
+        }
+        Timer? expiry;
+        void clear() => out.add(
+          PointCloudFrame(
+            ts: DateTime.now(),
+            points: const [],
+            available: false,
+          ),
+        );
+        clear();
+        final frames = _cloudEvents.stream
+            .where((e) => e.deviceId == deviceId)
+            .listen(
+              (e) {
+                expiry?.cancel();
+                out.add(e.frame);
+                expiry = Timer(const Duration(seconds: 2), clear);
+              },
+              onDone: () {
+                expiry?.cancel();
+                out.close();
+              },
+            );
+        final connection = watchConnection().listen((online) {
+          if (!online) {
+            expiry?.cancel();
+            clear();
+          }
+        });
+        out.onCancel = () {
+          expiry?.cancel();
+          unawaited(frames.cancel());
+          unawaited(connection.cancel());
+          final remaining = (_cloudListeners[deviceId] ?? 1) - 1;
+          if (remaining <= 0) {
+            _cloudListeners.remove(deviceId);
+            if (connected) {
+              _cameraSend({
+                'type': 'pointcloud',
+                'device_id': deviceId,
+                'enable': false,
+              });
+            }
+          } else {
+            _cloudListeners[deviceId] = remaining;
+          }
+        };
+      });
   @override
   Stream<SensorStatus> watchStatus(String deviceId) => poll(() async {
     final j = jsonMap(await api.get(_device(deviceId)));
     final sensors = (j['meta'] as Map?)?['sensors'] as Map? ?? {};
+    final lidar = _lidarInfo[deviceId];
     List<SensorSource> sources(Object? list) => [
       for (final s in jsonRows(list ?? []))
         SensorSource(
@@ -491,7 +601,13 @@ class LiveRobotRepository
     return SensorStatus(
       cameras: sources(sensors['cameras']),
       topics: sources(sensors['topics']),
-      lidar: sensors['lidar'] is String ? sensors['lidar'] : '尚未接入',
+      lidar: lidar?['source'] == 'pointcloud'
+          ? 'Go2 LiDAR · 实时点云'
+          : lidar?['source'] == 'height_map'
+          ? 'Go2 LiDAR · 高程图障碍投影'
+          : sensors['lidar'] is String
+          ? sensors['lidar']
+          : '尚未接入',
     );
   });
   void dispose() {
@@ -508,6 +624,7 @@ class LiveRobotRepository
     unawaited(_socket?.close());
     _connection.add(false);
     unawaited(_events.close());
+    unawaited(_cloudEvents.close());
     unawaited(_connection.close());
   }
 }

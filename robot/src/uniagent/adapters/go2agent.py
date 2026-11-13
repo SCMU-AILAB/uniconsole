@@ -54,6 +54,7 @@ class Go2AgentBackend(RobotBackend):
         simulated: bool = False,
         video_enabled: bool = False,
         video_fps: int = 10,
+        lidar_enabled: bool = False,
     ) -> None:
         try:
             from core.runtime import SkillRuntime
@@ -67,6 +68,10 @@ class Go2AgentBackend(RobotBackend):
         self._video_enabled = video_enabled and not simulated
         self._video_fps = video_fps
         self._camera = None
+        self._lidar_enabled = lidar_enabled and not simulated
+        self._lidar = None
+        self._lidar_frame = None
+        self._lidar_sent = -1
         self.limits = limits
         if simulated:
             self.robot = SimulatedRobotAdapter()
@@ -100,8 +105,21 @@ class Go2AgentBackend(RobotBackend):
                 self.capabilities = (*type(self).capabilities, "webrtc")
             except Exception:
                 log.exception("Go2Agent 前置相机初始化失败，控制与遥测仍可使用")
+        if self._lidar_enabled:
+            try:
+                from perception.go2_lidar import Go2Lidar
+
+                self._lidar = Go2Lidar()
+                await asyncio.to_thread(self._lidar.start)
+                self.capabilities = (*self.capabilities, "pointcloud")
+            except Exception:
+                self._lidar = None
+                log.exception("Go2Agent 雷达初始化失败")
 
     async def close(self) -> None:
+        if self._lidar is not None:
+            await asyncio.to_thread(self._lidar.close)
+            self._lidar = None
         if self._camera is not None:
             await asyncio.to_thread(self._camera.close)
             if self._camera.status.state == "close_timeout":
@@ -117,7 +135,7 @@ class Go2AgentBackend(RobotBackend):
         return None if frame is None else CameraFrame(frame.seq, frame.stamp, frame.jpeg)
 
     def sensors(self) -> dict[str, Any] | None:
-        if self._camera is None:
+        if self._camera is None and self._lidar is None:
             return None
         frame = self.camera_frame()
         healthy = frame is not None and time.monotonic() - frame.stamp < 2
@@ -129,8 +147,36 @@ class Go2AgentBackend(RobotBackend):
                     "health": "ok" if healthy else "idle",
                     "hz": self._video_fps,
                 }
-            ],
-            "topics": [],
+            ]
+            if self._camera is not None
+            else [],
+            "lidar": "Go2 LiDAR（点云 / 高程图）" if self._lidar is not None else "尚未接入",
+            "topics": [
+                {"name": "/utlidar/cloud_deskewed", "detail": "雷达原始点云（去畸变）", "health": "idle"},
+                {"name": "/utlidar/height_map_array", "detail": "雷达高程图（备用）", "health": "idle"},
+            ]
+            if self._lidar
+            else [],
+        }
+
+    async def pointcloud(self) -> list[tuple[float, float]] | None:
+        if self._lidar is None:
+            return None
+        self._lidar_frame = frame = await asyncio.to_thread(self._lidar.latest)
+        if frame is None or frame.seq == self._lidar_sent:
+            return None
+        self._lidar_sent = frame.seq
+        return list(frame.points)
+
+    def lidar_info(self) -> dict[str, Any] | None:
+        if self._lidar is None:
+            return None
+        frame = self._lidar_frame
+        return {
+            "source": frame.source if frame else None,
+            "age_ms": round((time.monotonic() - frame.stamp) * 1000) if frame else None,
+            "points": len(frame.points) if frame else 0,
+            **self._lidar.diagnostics(),
         }
 
     def info(self) -> dict[str, Any]:
@@ -221,5 +267,6 @@ class Go2AgentBackend(RobotBackend):
                 "error_code": d.get("error_code"),
                 "hardware": state.hardware,
                 "unavailable": ["battery", "voltage", "current", "wz", "acc"],
+                "lidar": self.lidar_info(),
             },
         )
